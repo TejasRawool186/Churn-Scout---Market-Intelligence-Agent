@@ -1,0 +1,48 @@
+{
+    "actorSpecification": 1,
+    "name": "churn-scout",
+    "title": "Churn Scout - Market Intelligence Agent",
+    "description": "Autonomous market intelligence agent that identifies why customers are leaving a competitor by analyzing public sentiment signals. Uses ML to cluster complaints into actionable Pain Points.",
+    "version": "1.0.0",
+    "buildTag": "latest",
+    "meta": {
+        "templateId": "python-playwright"
+    },
+    "input": "./input_schema.json",
+    "dockerfile": "../Dockerfile",
+    "storages": {
+        "dataset": {
+            "actorSpecification": 1,
+            "title": "Churn Intelligence Data",
+            "views": {
+                "overview": {
+                    "title": "Churn Signals Overview",
+                    "transformation": {
+                        "fields": ["topic", "text", "polarity", "url"]
+                    },
+                    "display": {
+                        "component": "table",
+                        "properties": {
+                            "topic": {
+                                "label": "Pain Point Topic",
+                                "format": "text"
+                            },
+                            "text": {
+                                "label": "Complaint Snippet",
+                                "format": "text"
+                            },
+                            "polarity": {
+                                "label": "Sentiment Score",
+                                "format": "number"
+                            },
+                            "url": {
+                                "label": "Source URL",
+                                "format": "link"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

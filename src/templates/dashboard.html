@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churn Scout: {{ competitor }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --primary: #2563eb; 
+            --danger: #dc2626; 
+            --bg: #0f172a; 
+            --card: #1e293b; 
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --gradient-1: #3b82f6;
+            --gradient-2: #8b5cf6;
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg); 
+            color: var(--text); 
+            margin: 0; 
+            padding: 40px;
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+        }
+        
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        /* Header */
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        h1 { 
+            font-size: 2.5rem; 
+            margin: 0;
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .badge { 
+            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2)); 
+            color: white; 
+            padding: 8px 20px; 
+            border-radius: 25px; 
+            font-size: 0.85rem; 
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Stats Grid */
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+            gap: 24px; 
+            margin-bottom: 40px; 
+        }
+        
+        .card { 
+            background: var(--card); 
+            padding: 28px; 
+            border-radius: 16px; 
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.15);
+        }
+        
+        .stat-val { 
+            font-size: 3rem; 
+            font-weight: 800; 
+            color: var(--text);
+            line-height: 1.1;
+        }
+        
+        .stat-label { 
+            color: var(--text-muted); 
+            font-size: 0.85rem; 
+            text-transform: uppercase; 
+            letter-spacing: 1.5px;
+            margin-bottom: 8px;
+        }
+        
+        .stat-val.danger {
+            color: var(--danger);
+        }
+        
+        .stat-val.small {
+            font-size: 1.4rem;
+            line-height: 1.4;
+        }
+        
+        /* Topics Section */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.25rem;
+            margin-bottom: 24px;
+        }
+        
+        .topics-list { 
+            list-style: none; 
+            padding: 0; 
+            margin: 0;
+        }
+        
+        .topics-list li { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 16px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .topics-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .topic-name {
+            font-weight: 600;
+            min-width: 200px;
+        }
+        
+        .bar-container { 
+            flex-grow: 1; 
+            margin: 0 24px; 
+            background: rgba(255,255,255,0.1); 
+            height: 8px; 
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .bar-fill { 
+            height: 100%; 
+            background: linear-gradient(90deg, var(--danger), #f87171); 
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        .topic-count {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            min-width: 80px;
+            text-align: right;
+        }
+        
+        /* Data Table */
+        .table-container {
+            overflow-x: auto;
+        }
+        
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 16px; 
+        }
+        
+        th { 
+            text-align: left; 
+            padding: 16px; 
+            color: var(--text-muted); 
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-weight: 600;
+        }
+        
+        td { 
+            padding: 16px; 
+            border-bottom: 1px solid rgba(255,255,255,0.05); 
+            vertical-align: top;
+            font-size: 0.9rem;
+        }
+        
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+        
+        .topic-tag { 
+            background: rgba(220, 38, 38, 0.2); 
+            color: #fca5a5; 
+            padding: 6px 12px; 
+            border-radius: 6px; 
+            font-size: 0.7rem; 
+            font-weight: 700; 
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: inline-block;
+        }
+        
+        .sentiment-score { 
+            font-family: 'JetBrains Mono', monospace; 
+            color: var(--danger);
+            font-weight: 600;
+        }
+        
+        a { 
+            color: var(--gradient-1); 
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+        
+        a:hover {
+            color: var(--gradient-2);
+        }
+        
+        .complaint-text {
+            color: var(--text);
+            line-height: 1.5;
+        }
+        
+        /* Footer */
+        footer {
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+        
+        footer a {
+            color: var(--gradient-1);
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            body {
+                padding: 20px;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+            
+            h1 {
+                font-size: 1.8rem;
+            }
+            
+            .stat-val {
+                font-size: 2.2rem;
+            }
+            
+            .topic-name {
+                min-width: auto;
+                font-size: 0.85rem;
+            }
+            
+            .bar-container {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">🔍</div>
+                <div>
+                    <h1>{{ competitor }}</h1>
+                    <div class="subtitle">Market Intelligence Report by Churn Scout</div>
+                </div>
+            </div>
+            <div class="badge">Zero-API Analysis</div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="stat-label">Churn Signals Detected</div>
+                <div class="stat-val">{{ total }}</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Average Sentiment Score</div>
+                <div class="stat-val danger">{{ sentiment }}</div>
+            </div>
+            <div class="card">
+                <div class="stat-label">Top Pain Point</div>
+                <div class="stat-val small">
+                    {% if topics %}{{ topics.keys() | list | first }}{% else %}None Detected{% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-title">
+                <span>🔥</span>
+                <span>Critical Issues (Clustered by ML)</span>
+            </div>
+            <ul class="topics-list">
+                {% for topic, count in topics.items() %}
+                <li>
+                    <span class="topic-name">{{ topic }}</span>
+                    <div class="bar-container">
+                        <div class="bar-fill" style="width: {{ (count / total * 100) | int }}%"></div>
+                    </div>
+                    <span class="topic-count">{{ count }} reports</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <div class="card" style="margin-top: 30px;">
+            <div class="section-title">
+                <span>💬</span>
+                <span>Raw Evidence</span>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th width="20%">Topic</th>
+                            <th width="60%">Complaint Snippet</th>
+                            <th width="10%">Score</th>
+                            <th width="10%">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in records %}
+                        <tr>
+                            <td><span class="topic-tag">{{ row.topic }}</span></td>
+                            <td class="complaint-text">
+                                {{ row.text[:150] }}{% if row.text|length > 150 %}...{% endif %}
+                            </td>
+                            <td class="sentiment-score">{{ "%.2f"|format(row.polarity) }}</td>
+                            <td><a href="{{ row.url }}" target="_blank" rel="noopener">View →</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <footer>
+            <p>Generated by <strong>Churn Scout</strong> — Your AI-Powered Market Intelligence Agent</p>
+            <p>Powered by Playwright + Scikit-Learn • Zero API Keys Required</p>
+        </footer>
+    </div>
+</body>
+</html>

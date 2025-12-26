@@ -1,0 +1,34 @@
+{
+    "title": "Churn Scout Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "competitorName": {
+            "title": "Competitor Name",
+            "type": "string",
+            "description": "The brand you want to spy on (e.g. 'Notion', 'Jira').",
+            "editor": "textfield",
+            "prefill": "Jira"
+        },
+        "maxPosts": {
+            "title": "Sample Size",
+            "type": "integer",
+            "description": "How many posts to analyze. Higher = Slower but more accurate.",
+            "default": 100,
+            "minimum": 50,
+            "maximum": 500
+        },
+        "proxyConfiguration": {
+            "title": "Proxy Settings",
+            "type": "object",
+            "description": "Recommended to avoid blocking.",
+            "editor": "proxy",
+            "default": {
+                "useApifyProxy": true
+            }
+        }
+    },
+    "required": [
+        "competitorName"
+    ]
+}

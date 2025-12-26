@@ -1,0 +1,8 @@
+apify
+playwright
+textblob
+scikit-learn
+pandas
+jinja2
+beautifulsoup4
+numpy
