@@ -3,7 +3,6 @@ import pandas as pd
 import random
 import aiohttp
 from apify import Actor
-from playwright.async_api import async_playwright
 from textblob import TextBlob
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
@@ -23,54 +22,54 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
 ]
 
-# --- PART 1: THE SCRAPER (Using Reddit JSON API) ---
-async def scrape_reddit(query, limit, proxy_config):
+# --- PART 1: THE MULTI-SOURCE SCRAPER ---
+async def scrape_market_intel(query, limit, proxy_config):
     """
-    Scrapes Reddit search using the public JSON API (much faster and reliable).
-    Falls back to Playwright only if JSON API fails.
+    Scrapes multiple public sources for market intelligence.
+    Uses Hacker News (Algolia API) and GitHub Issues - both Apify-compliant.
     """
     print(f"🕵️‍♂️ Deploying Scout for: {query}...")
-    results = []
+    all_results = []
     
-    # Try Reddit JSON API first (fast, no browser needed)
-    results = await scrape_reddit_json(query, limit)
+    # 1. Hacker News (Algolia API - public, no auth)
+    hn_results = await scrape_hackernews(query, limit // 2)
+    all_results.extend(hn_results)
     
-    # Fallback to Playwright if JSON API fails
-    if not results:
-        print("⚠️ JSON API failed, trying Playwright fallback...")
-        results = await scrape_reddit_playwright(query, limit, proxy_config)
+    # 2. GitHub Issues (public API)
+    github_results = await scrape_github_issues(query, limit // 2)
+    all_results.extend(github_results)
     
-    # Final fallback: sample data for demo purposes
-    if not results:
+    print(f"📊 Total collected: {len(all_results)} signals")
+    
+    # Fallback to sample data if nothing found
+    if not all_results:
         print("⚠️ No live data found. Using sample market intelligence data...")
-        results = generate_sample_data(query, min(20, limit))
+        all_results = generate_sample_data(query, min(20, limit))
     
-    return results
+    return all_results
 
 
-async def scrape_reddit_json(query, limit):
+async def scrape_hackernews(query, limit):
     """
-    Uses Reddit's public JSON API for fast, reliable scraping.
-    No authentication needed for public search.
+    Uses Hacker News Search API (powered by Algolia) - public, no auth required.
+    Great for tech product complaints and discussions.
     """
     results = []
-    search_terms = f'{query} (problem OR expensive OR alternative OR hate OR frustrating)'
+    search_terms = f'{query} (problem OR expensive OR alternative OR hate OR bug OR issue)'
     encoded_query = quote(search_terms)
     
-    # Reddit JSON endpoints
+    # Algolia HN Search API - completely public
     urls = [
-        f"https://www.reddit.com/search.json?q={encoded_query}&sort=relevance&limit={min(100, limit)}&t=all",
-        f"https://www.reddit.com/search.json?q={encoded_query}&sort=new&limit={min(100, limit)}&t=year",
+        f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=story&hitsPerPage={min(50, limit)}",
+        f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=comment&hitsPerPage={min(50, limit)}",
     ]
     
-    # Reddit requires a specific User-Agent format to avoid 403
     headers = {
-        'User-Agent': 'ChurnScout/1.0 (Market Intelligence Bot; +https://apify.com)',
+        'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'application/json',
-        'Accept-Language': 'en-US,en;q=0.9',
     }
     
-    print("🌐 Fetching from Reddit JSON API...")
+    print("🟠 Fetching from Hacker News (Algolia API)...")
     
     async with aiohttp.ClientSession() as session:
         for url in urls:
@@ -78,114 +77,99 @@ async def scrape_reddit_json(query, limit):
                 break
                 
             try:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
                     if response.status == 200:
                         data = await response.json()
-                        posts = data.get('data', {}).get('children', [])
+                        hits = data.get('hits', [])
                         
-                        print(f"📥 Found {len(posts)} posts from Reddit API")
+                        print(f"📥 Found {len(hits)} items from Hacker News")
                         
-                        for post in posts:
+                        for hit in hits:
                             if len(results) >= limit:
                                 break
                             
-                            post_data = post.get('data', {})
-                            title = post_data.get('title', '')
-                            selftext = post_data.get('selftext', '')[:200]  # Limit text length
-                            permalink = post_data.get('permalink', '')
+                            title = hit.get('title', '') or hit.get('comment_text', '')[:200]
+                            story_text = hit.get('story_text', '') or ''
+                            object_id = hit.get('objectID', '')
                             
-                            text = f"{title} {selftext}".strip()
+                            text = f"{title} {story_text[:150]}".strip()
                             
                             if text and len(text) > 15:
                                 results.append({
                                     "text": text,
-                                    "url": f"https://reddit.com{permalink}" if permalink else "https://reddit.com",
-                                    "source": "Reddit"
+                                    "url": f"https://news.ycombinator.com/item?id={object_id}",
+                                    "source": "Hacker News"
                                 })
                         
-                        # Small delay between requests
-                        await asyncio.sleep(1)
+                        await asyncio.sleep(0.5)
                         
-                    elif response.status == 429:
-                        print("⚠️ Rate limited by Reddit API, waiting...")
-                        await asyncio.sleep(5)
                     else:
-                        print(f"⚠️ Reddit API returned status {response.status}")
+                        print(f"⚠️ HN API returned status {response.status}")
                         
             except asyncio.TimeoutError:
-                print("⚠️ Reddit API request timed out")
+                print("⚠️ HN API request timed out")
             except Exception as e:
-                print(f"⚠️ Reddit API error: {e}")
+                print(f"⚠️ HN API error: {e}")
     
-    print(f"📊 Collected {len(results)} signals from JSON API")
+    print(f"📊 Collected {len(results)} signals from Hacker News")
     return results
 
 
-async def scrape_reddit_playwright(query, limit, proxy_config):
+async def scrape_github_issues(query, limit):
     """
-    Fallback: Uses Playwright browser for scraping (slower, may timeout).
-    Only used if JSON API fails.
+    Uses GitHub Issues Search API - public, no auth for basic searches.
+    Great for finding bug reports and feature complaints.
     """
-    print("🔄 Using Playwright browser fallback...")
     results = []
+    search_terms = f'{query} bug OR issue OR problem OR broken'
+    encoded_query = quote(search_terms)
     
-    # Setup Proxy
-    proxy_url = None
-    if proxy_config:
+    # GitHub public search API
+    url = f"https://api.github.com/search/issues?q={encoded_query}&sort=created&order=desc&per_page={min(30, limit)}"
+    
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'application/vnd.github.v3+json',
+    }
+    
+    print("🐙 Fetching from GitHub Issues API...")
+    
+    async with aiohttp.ClientSession() as session:
         try:
-            proxy_info = await Actor.create_proxy_configuration(actor_proxy_input=proxy_config)
-            if proxy_info:
-                proxy_url = await proxy_info.new_url()
-                print(f"🔒 Proxy configured")
-        except Exception as e:
-            print(f"⚠️ Proxy setup warning: {e}")
-
-    try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=True,
-                args=['--disable-blink-features=AutomationControlled', '--no-sandbox'],
-                proxy={"server": proxy_url} if proxy_url else None
-            )
-            
-            context = await browser.new_context(
-                user_agent=random.choice(USER_AGENTS),
-                viewport={'width': 1920, 'height': 1080},
-            )
-            
-            page = await context.new_page()
-            
-            search_query = quote(f'{query} (problem OR expensive OR alternative)')
-            url = f"https://old.reddit.com/search?q={search_query}&sort=relevance&t=all"
-            
-            # Shorter timeout for fallback
-            await page.goto(url, timeout=30000, wait_until='domcontentloaded')
-            await page.wait_for_timeout(2000)
-            
-            post_links = await page.locator('a.search-title').all()
-            
-            for post in post_links[:limit]:
-                try:
-                    text = await post.inner_text()
-                    link = await post.get_attribute('href')
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    items = data.get('items', [])
                     
-                    if text and len(text) > 15:
-                        if link and not link.startswith('http'):
-                            link = f"https://old.reddit.com{link}"
-                        results.append({
-                            "text": text.strip(),
-                            "url": link or "https://reddit.com",
-                            "source": "Reddit"
-                        })
-                except Exception:
-                    continue
-            
-            await browser.close()
-            
-    except Exception as e:
-        print(f"⚠️ Playwright fallback failed: {e}")
+                    print(f"📥 Found {len(items)} issues from GitHub")
+                    
+                    for item in items[:limit]:
+                        title = item.get('title', '')
+                        body = (item.get('body', '') or '')[:200]
+                        html_url = item.get('html_url', '')
+                        
+                        text = f"{title} {body}".strip()
+                        
+                        if text and len(text) > 15:
+                            results.append({
+                                "text": text,
+                                "url": html_url or "https://github.com",
+                                "source": "GitHub Issues"
+                            })
+                            
+                elif response.status == 403:
+                    print("⚠️ GitHub API rate limited")
+                else:
+                    print(f"⚠️ GitHub API returned status {response.status}")
+                    
+        except asyncio.TimeoutError:
+            print("⚠️ GitHub API request timed out")
+        except Exception as e:
+            print(f"⚠️ GitHub API error: {e}")
     
+    print(f"📊 Collected {len(results)} signals from GitHub")
     return results
+
 
 
 def generate_sample_data(competitor, count):
@@ -213,8 +197,8 @@ def generate_sample_data(competitor, count):
     for i in range(min(count, len(templates))):
         results.append({
             "text": templates[i],
-            "url": f"https://reddit.com/r/software/comments/sample{i}",
-            "source": "Reddit (Sample)"
+            "url": f"https://example.com/sample/{i}",
+            "source": "Sample Data"
         })
     
     return results
@@ -321,8 +305,8 @@ async def main():
         else:
             print("ℹ️ No API key provided - using ML-only analysis")
 
-        # 1. Scrape
-        raw_data = await scrape_reddit(competitor, limit, proxy)
+        # 1. Scrape from multiple sources (Hacker News + GitHub)
+        raw_data = await scrape_market_intel(competitor, limit, proxy)
         
         if not raw_data:
             await Actor.push_data({"status": "Failed", "error": "No data found."})
