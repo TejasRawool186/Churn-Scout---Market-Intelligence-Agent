@@ -55,6 +55,8 @@ async def scrape_hackernews(query, limit):
     Great for tech product complaints and discussions.
     """
     results = []
+    # Split query into words for flexible matching
+    query_words = [w.lower() for w in query.split() if len(w) > 2]
     search_terms = f'{query} problem OR issue OR hate OR bad OR expensive OR alternative OR switch'
     encoded_query = quote(search_terms)
     
@@ -99,8 +101,11 @@ async def scrape_hackernews(query, limit):
                         else:
                             text = f"{title} {story_text[:200]}".strip()
                         
-                        # Filter out very short or irrelevant content
-                        if text and len(text) > 25 and query.lower() in text.lower():
+                        # Filter: accept if text contains any query word (more flexible)
+                        text_lower = text.lower()
+                        is_relevant = any(word in text_lower for word in query_words)
+                        
+                        if text and len(text) > 25 and is_relevant:
                             results.append({
                                 "text": text,
                                 "url": f"https://news.ycombinator.com/item?id={object_id}",
@@ -127,6 +132,8 @@ async def scrape_github_issues(query, limit):
     Great for finding bug reports and feature complaints.
     """
     results = []
+    # Split query into words for flexible matching
+    query_words = [w.lower() for w in query.split() if len(w) > 2]
     search_terms = f'{query} bug OR issue OR problem OR broken OR slow OR crash'
     encoded_query = quote(search_terms)
     
@@ -167,8 +174,11 @@ async def scrape_github_issues(query, limit):
                         
                         text = f"{title} {body}".strip()
                         
-                        # Filter by relevance
-                        if text and len(text) > 25 and query.lower() in text.lower():
+                        # Filter: accept if text contains any query word (more flexible)
+                        text_lower = text.lower()
+                        is_relevant = any(word in text_lower for word in query_words)
+                        
+                        if text and len(text) > 25 and is_relevant:
                             results.append({
                                 "text": text,
                                 "url": html_url or "https://github.com",
