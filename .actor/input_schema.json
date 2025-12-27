@@ -6,9 +6,9 @@
         "competitorName": {
             "title": "Competitor Name",
             "type": "string",
-            "description": "The brand you want to spy on (e.g. 'Notion', 'Jira').",
+            "description": "The brand you want to spy on (e.g. 'Zomato', 'Jira', 'Notion').",
             "editor": "textfield",
-            "prefill": "Jira"
+            "prefill": "Zomato"
         },
         "maxPosts": {
             "title": "Sample Size",

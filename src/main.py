@@ -26,20 +26,29 @@ USER_AGENTS = [
 async def scrape_market_intel(query, limit, proxy_config):
     """
     Scrapes multiple public sources for market intelligence.
-    Uses Hacker News (Algolia API) and GitHub Issues - both Apify-compliant.
+    All sources are Apify-compliant with public APIs.
     """
     print(f"🕵️‍♂️ Deploying Scout for: {query}...")
     all_results = []
+    per_source_limit = max(10, limit // 4)  # Divide across sources
     
     # 1. Hacker News (Algolia API - public, no auth)
-    hn_results = await scrape_hackernews(query, limit // 2)
+    hn_results = await scrape_hackernews(query, per_source_limit)
     all_results.extend(hn_results)
     
     # 2. GitHub Issues (public API)
-    github_results = await scrape_github_issues(query, limit // 2)
+    github_results = await scrape_github_issues(query, per_source_limit)
     all_results.extend(github_results)
     
-    print(f"📊 Total collected: {len(all_results)} signals")
+    # 3. DEV.to Articles (public API)
+    devto_results = await scrape_devto(query, per_source_limit)
+    all_results.extend(devto_results)
+    
+    # 4. StackExchange (public API)
+    stackexchange_results = await scrape_stackexchange(query, per_source_limit)
+    all_results.extend(stackexchange_results)
+    
+    print(f"📊 Total collected: {len(all_results)} signals from 4 sources")
     
     # Fallback to sample data if nothing found
     if not all_results:
@@ -203,6 +212,124 @@ async def scrape_github_issues(query, limit):
     print(f"📊 Collected {len(results)} signals from GitHub")
     return results
 
+
+async def scrape_devto(query, limit):
+    """
+    Uses DEV.to API - public, no auth required.
+    Great for developer opinions and reviews.
+    """
+    results = []
+    query_words = [w.lower() for w in query.split() if len(w) > 2]
+    encoded_query = quote(query)
+    
+    url = f"https://dev.to/api/articles?tag={encoded_query}&per_page={min(30, limit)}"
+    
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'application/json',
+    }
+    
+    print("📝 Fetching from DEV.to API...")
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
+                if response.status == 200:
+                    articles = await response.json()
+                    
+                    print(f"📥 Found {len(articles)} articles from DEV.to")
+                    
+                    for article in articles[:limit]:
+                        title = article.get('title', '')
+                        description = article.get('description', '') or ''
+                        article_url = article.get('url', '')
+                        published_at = article.get('published_at', '')[:10] if article.get('published_at') else 'Unknown'
+                        reactions = article.get('positive_reactions_count', 0)
+                        
+                        text = f"{title} {description}".strip()
+                        text_lower = text.lower()
+                        is_relevant = any(word in text_lower for word in query_words)
+                        
+                        if text and len(text) > 25 and is_relevant:
+                            results.append({
+                                "text": text,
+                                "url": article_url,
+                                "source": "DEV.to",
+                                "date": published_at,
+                                "engagement": reactions
+                            })
+                else:
+                    print(f"⚠️ DEV.to API returned status {response.status}")
+                    
+        except asyncio.TimeoutError:
+            print("⚠️ DEV.to API request timed out")
+        except Exception as e:
+            print(f"⚠️ DEV.to API error: {e}")
+    
+    print(f"📊 Collected {len(results)} signals from DEV.to")
+    return results
+
+
+async def scrape_stackexchange(query, limit):
+    """
+    Uses StackExchange API - public, no auth for basic queries.
+    Great for finding user complaints and issues.
+    """
+    results = []
+    query_words = [w.lower() for w in query.split() if len(w) > 2]
+    encoded_query = quote(query)
+    
+    # Search across multiple Stack Exchange sites
+    url = f"https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={encoded_query}&site=stackoverflow&pagesize={min(25, limit)}"
+    
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'application/json',
+    }
+    
+    print("📚 Fetching from StackExchange API...")
+    
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    questions = data.get('items', [])
+                    
+                    print(f"📥 Found {len(questions)} questions from StackExchange")
+                    
+                    for q in questions[:limit]:
+                        title = q.get('title', '')
+                        link = q.get('link', '')
+                        creation_date = q.get('creation_date', 0)
+                        score = q.get('score', 0)
+                        answer_count = q.get('answer_count', 0)
+                        
+                        # Convert timestamp to date
+                        from datetime import datetime
+                        date_str = datetime.fromtimestamp(creation_date).strftime('%Y-%m-%d') if creation_date else 'Unknown'
+                        
+                        text_lower = title.lower()
+                        is_relevant = any(word in text_lower for word in query_words)
+                        
+                        if title and len(title) > 15 and is_relevant:
+                            results.append({
+                                "text": title,
+                                "url": link,
+                                "source": "StackOverflow",
+                                "date": date_str,
+                                "engagement": score + answer_count
+                            })
+                else:
+                    print(f"⚠️ StackExchange API returned status {response.status}")
+                    
+        except asyncio.TimeoutError:
+            print("⚠️ StackExchange API request timed out")
+        except Exception as e:
+            print(f"⚠️ StackExchange API error: {e}")
+    
+    print(f"📊 Collected {len(results)} signals from StackExchange")
+    return results
 
 
 def generate_sample_data(competitor, count):
