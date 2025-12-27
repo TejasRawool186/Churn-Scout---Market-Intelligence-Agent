@@ -227,6 +227,34 @@ def generate_sample_data(competitor, count):
     return results
 
 # --- PART 2: THE INTELLIGENCE ENGINE (ML) ---
+
+# Define semantic categories for better topic labels
+TOPIC_PATTERNS = {
+    'Pricing Issues': ['expensive', 'price', 'pricing', 'cost', 'costly', 'money', 'pay', 'subscription', 'fee', 'overpriced', 'cheap'],
+    'Performance Problems': ['slow', 'lag', 'crash', 'freeze', 'hang', 'performance', 'speed', 'memory', 'cpu', 'loading', 'timeout'],
+    'UI/UX Frustrations': ['ui', 'ux', 'interface', 'design', 'confusing', 'ugly', 'hate', 'annoying', 'frustrating', 'changed', 'layout'],
+    'Feature Gaps': ['feature', 'missing', 'need', 'want', 'wish', 'lacking', 'doesnt have', 'cant do', 'no support'],
+    'Migration Intent': ['switch', 'switching', 'alternative', 'alternatives', 'moving', 'migrate', 'replace', 'looking for'],
+    'Support Issues': ['support', 'help', 'documentation', 'docs', 'response', 'ticket', 'customer service', 'unresponsive'],
+    'Reliability Issues': ['bug', 'bugs', 'error', 'broken', 'fail', 'issue', 'problem', 'doesnt work', 'not working'],
+    'Integration Problems': ['integration', 'api', 'connect', 'sync', 'import', 'export', 'compatibility', 'plugin'],
+}
+
+def categorize_text(text):
+    """Categorize text into semantic topics based on keyword matching."""
+    text_lower = text.lower()
+    scores = {}
+    
+    for category, keywords in TOPIC_PATTERNS.items():
+        score = sum(1 for kw in keywords if kw in text_lower)
+        if score > 0:
+            scores[category] = score
+    
+    if scores:
+        return max(scores, key=scores.get)
+    return 'General Feedback'
+
+
 def analyze_market_intel(data):
     if not data: 
         return pd.DataFrame()
@@ -238,8 +266,10 @@ def analyze_market_intel(data):
     # -1.0 (Hate) to 1.0 (Love)
     df['polarity'] = df['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
     
+    # B. Semantic Topic Categorization (Rule-based for cleaner labels)
+    df['topic'] = df['text'].apply(categorize_text)
+    
     # Filter: We only care about Negative Sentiment (Churn Signals)
-    # Use a more lenient threshold for better results
     churn_df = df[df['polarity'] < 0].copy()
     
     # If not enough negative, use all data but sort by polarity
@@ -249,41 +279,23 @@ def analyze_market_intel(data):
         churn_df = churn_df.sort_values('polarity').head(max(10, len(df)))
     
     if len(churn_df) < 3:
-        # Not enough for clustering, assign default topic
-        churn_df['topic'] = 'GENERAL FEEDBACK'
         churn_df['cluster'] = 0
         return churn_df
 
-    # B. Topic Clustering (Unsupervised Learning)
+    # C. Optional: Use clustering to validate/refine categories
     try:
-        # 1. Vectorize Text
         vectorizer = TfidfVectorizer(stop_words='english', max_features=500, min_df=1)
         X = vectorizer.fit_transform(churn_df['text'])
         
-        # 2. Determine K (Number of clusters) - minimum 2
         num_clusters = max(2, min(5, len(churn_df) // 3))
-        
-        # 3. K-Means
         kmeans = KMeans(n_clusters=num_clusters, n_init=10, random_state=42)
         kmeans.fit(X)
         churn_df['cluster'] = kmeans.labels_
-
-        # 4. Label the Clusters
-        print("🏷️ Generating Topic Labels...")
-        feature_names = vectorizer.get_feature_names_out()
-        topic_map = {}
         
-        for i in range(num_clusters):
-            centroid = kmeans.cluster_centers_[i]
-            top_indices = centroid.argsort()[-3:][::-1]
-            keywords = [feature_names[ind] for ind in top_indices]
-            topic_map[i] = "Issue: " + ", ".join(keywords).upper()
-        
-        churn_df['topic'] = churn_df['cluster'].map(topic_map)
+        print(f"🏷️ Categorized into {churn_df['topic'].nunique()} topic categories")
         
     except Exception as e:
         print(f"⚠️ Clustering error: {e}")
-        churn_df['topic'] = 'GENERAL FEEDBACK'
         churn_df['cluster'] = 0
     
     return churn_df
