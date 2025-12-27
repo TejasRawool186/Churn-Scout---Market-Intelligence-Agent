@@ -331,32 +331,24 @@ async def main():
         # 3. Report
         html = generate_dashboard(competitor, intel_df)
         
-        # Save HTML to KVS
+        # Save HTML to KVS - use 'OUTPUT' key for direct visibility in Output tab
+        await Actor.set_value('OUTPUT', html, content_type='text/html')
+        
+        # Also save as named dashboard for direct access
         await Actor.set_value('OUTPUT_DASHBOARD', html, content_type='text/html')
         
         # Save JSON Data
         output_df = intel_df[['text', 'topic', 'polarity', 'url']].copy()
         await Actor.push_data(output_df.to_dict(orient='records'))
         
-        # Generate Public Link using proper Apify SDK method
-        try:
-            store = await Actor.open_key_value_store()
-            store_info = store.get_info()
-            if store_info and hasattr(store_info, 'id'):
-                kvs_id = store_info.id
-            else:
-                # Fallback: get from environment
-                import os
-                kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'default')
-            
-            url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT_DASHBOARD"
-            print(f"🚀 INTELLIGENCE REPORT READY: {url}")
-            
-            # Output URL to Dataset for easy access
-            await Actor.push_data({"dashboard_url": url})
-        except Exception as e:
-            print(f"⚠️ Could not generate dashboard URL: {e}")
-            await Actor.push_data({"dashboard_url": "See OUTPUT_DASHBOARD in Key-Value Store"})
+        # Generate Public Link using environment variable
+        import os
+        kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'unknown')
+        url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT"
+        print(f"🚀 INTELLIGENCE REPORT READY: {url}")
+        
+        # Output URL to Dataset for easy access
+        await Actor.push_data({"dashboard_url": url})
 
 if __name__ == '__main__':
     asyncio.run(main())

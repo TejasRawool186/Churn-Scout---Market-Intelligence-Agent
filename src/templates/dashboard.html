@@ -1,388 +1,657 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Churn Scout: {{ competitor }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <title>Churn Scout: {{ competitor }} | Market Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
     <style>
-        :root { 
-            --primary: #2563eb; 
-            --danger: #dc2626; 
-            --bg: #0f172a; 
-            --card: #1e293b; 
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
-            --gradient-1: #3b82f6;
-            --gradient-2: #8b5cf6;
+        :root {
+            --primary: #6366f1;
+            --primary-light: #818cf8;
+            --danger: #ef4444;
+            --danger-light: #f87171;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --bg-dark: #030712;
+            --bg-card: #111827;
+            --bg-card-hover: #1f2937;
+            --text-primary: #f9fafb;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            --border: rgba(255, 255, 255, 0.08);
+            --glow-primary: rgba(99, 102, 241, 0.4);
+            --glow-danger: rgba(239, 68, 68, 0.4);
         }
-        
+
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-        
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            margin: 0; 
-            padding: 40px;
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
             min-height: 100vh;
-            background-image: 
-                radial-gradient(ellipse at top left, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+            line-height: 1.6;
         }
-        
-        .container { max-width: 1200px; margin: 0 auto; }
-        
+
+        /* Animated Background */
+        .bg-gradient {
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 80% 50% at 20% -20%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(239, 68, 68, 0.1) 0%, transparent 50%),
+                radial-gradient(ellipse 50% 50% at 50% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 24px;
+            position: relative;
+            z-index: 1;
+        }
+
         /* Header */
-        header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 40px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 48px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid var(--border);
         }
-        
-        .logo {
+
+        .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 16px;
         }
-        
-        .logo-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
-            border-radius: 12px;
+
+        .brand-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 32px;
+            box-shadow: 0 8px 32px var(--glow-primary);
+            animation: pulse 3s ease-in-out infinite;
         }
-        
-        h1 { 
-            font-size: 2.5rem; 
-            margin: 0;
-            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2));
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 8px 32px var(--glow-primary);
+            }
+
+            50% {
+                box-shadow: 0 8px 48px var(--glow-primary), 0 0 60px var(--glow-primary);
+            }
+        }
+
+        .brand-text h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-light) 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            letter-spacing: -0.02em;
         }
-        
-        .subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
+
+        .brand-text p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
             margin-top: 4px;
         }
-        
-        .badge { 
-            background: linear-gradient(135deg, var(--gradient-1), var(--gradient-2)); 
-            color: white; 
-            padding: 8px 20px; 
-            border-radius: 25px; 
-            font-size: 0.85rem; 
+
+        .header-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+        }
+
+        .badge {
+            background: linear-gradient(135deg, var(--primary) 0%, #a855f7 100%);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-size: 0.8rem;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 20px var(--glow-primary);
         }
-        
+
+        .badge-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 100px;
+            font-size: 0.75rem;
+        }
+
         /* Stats Grid */
-        .grid { 
-            display: grid; 
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
-            gap: 24px; 
-            margin-bottom: 40px; 
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
         }
-        
-        .card { 
-            background: var(--card); 
-            padding: 28px; 
-            border-radius: 16px; 
-            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-            border: 1px solid rgba(255,255,255,0.05);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
         }
-        
-        .card:hover {
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), #a855f7);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(59, 130, 246, 0.15);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
         }
-        
-        .stat-val { 
-            font-size: 3rem; 
-            font-weight: 800; 
-            color: var(--text);
-            line-height: 1.1;
+
+        .stat-card:hover::before {
+            opacity: 1;
         }
-        
-        .stat-label { 
-            color: var(--text-muted); 
-            font-size: 0.85rem; 
-            text-transform: uppercase; 
+
+        .stat-card.danger::before {
+            background: linear-gradient(90deg, var(--danger), var(--warning));
+        }
+
+        .stat-label {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
             letter-spacing: 1.5px;
-            margin-bottom: 8px;
+            font-weight: 600;
+            margin-bottom: 12px;
         }
-        
-        .stat-val.danger {
+
+        .stat-value {
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .stat-value.danger {
             color: var(--danger);
         }
-        
-        .stat-val.small {
-            font-size: 1.4rem;
+
+        .stat-value.success {
+            color: var(--success);
+        }
+
+        .stat-value.small {
+            font-size: 1.3rem;
+            font-weight: 700;
             line-height: 1.4;
         }
-        
-        /* Topics Section */
+
+        .stat-trend {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .stat-trend.negative {
+            color: var(--danger-light);
+        }
+
+        /* Section Cards */
+        .section {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 28px;
+        }
+
         .section-title {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 1.25rem;
-            margin-bottom: 24px;
+            gap: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
         }
-        
-        .topics-list { 
-            list-style: none; 
-            padding: 0; 
-            margin: 0;
+
+        .section-title .icon {
+            font-size: 1.4rem;
         }
-        
-        .topics-list li { 
-            display: flex; 
-            justify-content: space-between; 
+
+        /* Pain Points Chart */
+        .pain-points {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .pain-point {
+            display: flex;
             align-items: center;
-            padding: 16px 0; 
-            border-bottom: 1px solid rgba(255,255,255,0.05);
+            gap: 20px;
         }
-        
-        .topics-list li:last-child {
-            border-bottom: none;
+
+        .pain-rank {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--danger), var(--warning));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 0.9rem;
+            flex-shrink: 0;
         }
-        
-        .topic-name {
+
+        .pain-info {
+            flex: 1;
+        }
+
+        .pain-name {
             font-weight: 600;
-            min-width: 200px;
+            margin-bottom: 8px;
+            color: var(--text-primary);
         }
-        
-        .bar-container { 
-            flex-grow: 1; 
-            margin: 0 24px; 
-            background: rgba(255,255,255,0.1); 
-            height: 8px; 
-            border-radius: 4px;
+
+        .pain-bar-bg {
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 5px;
             overflow: hidden;
         }
-        
-        .bar-fill { 
-            height: 100%; 
-            background: linear-gradient(90deg, var(--danger), #f87171); 
-            border-radius: 4px;
-            transition: width 0.5s ease;
+
+        .pain-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--danger), var(--danger-light));
+            border-radius: 5px;
+            transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        
-        .topic-count {
-            color: var(--text-muted);
-            font-size: 0.9rem;
+
+        .pain-count {
             min-width: 80px;
             text-align: right;
-        }
-        
-        /* Data Table */
-        .table-container {
-            overflow-x: auto;
-        }
-        
-        table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-top: 16px; 
-        }
-        
-        th { 
-            text-align: left; 
-            padding: 16px; 
-            color: var(--text-muted); 
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-weight: 600;
-        }
-        
-        td { 
-            padding: 16px; 
-            border-bottom: 1px solid rgba(255,255,255,0.05); 
-            vertical-align: top;
+            color: var(--text-secondary);
+            font-weight: 500;
             font-size: 0.9rem;
         }
-        
-        tr:hover {
-            background: rgba(255,255,255,0.02);
+
+        /* Evidence Table */
+        .evidence-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
         }
-        
-        .topic-tag { 
-            background: rgba(220, 38, 38, 0.2); 
-            color: #fca5a5; 
-            padding: 6px 12px; 
-            border-radius: 6px; 
-            font-size: 0.7rem; 
-            font-weight: 700; 
+
+        .evidence-table th {
+            text-align: left;
+            padding: 16px 20px;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .evidence-table th:first-child {
+            border-radius: 12px 0 0 0;
+        }
+
+        .evidence-table th:last-child {
+            border-radius: 0 12px 0 0;
+        }
+
+        .evidence-table td {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .evidence-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .topic-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger-light);
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            display: inline-block;
+            border: 1px solid rgba(239, 68, 68, 0.2);
         }
-        
-        .sentiment-score { 
-            font-family: 'JetBrains Mono', monospace; 
-            color: var(--danger);
+
+        .complaint-text {
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            max-width: 500px;
+        }
+
+        .sentiment-score {
+            font-family: 'SF Mono', 'Fira Code', monospace;
             font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
         }
-        
-        a { 
-            color: var(--gradient-1); 
+
+        .sentiment-score.negative {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger-light);
+        }
+
+        .link-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--primary-light);
             text-decoration: none;
             font-weight: 500;
-            transition: color 0.2s ease;
+            font-size: 0.9rem;
+            padding: 8px 16px;
+            border-radius: 8px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 1px solid transparent;
+            transition: all 0.2s ease;
         }
-        
-        a:hover {
-            color: var(--gradient-2);
+
+        .link-btn:hover {
+            background: rgba(99, 102, 241, 0.2);
+            border-color: rgba(99, 102, 241, 0.3);
         }
-        
-        .complaint-text {
-            color: var(--text);
+
+        /* Insights Section */
+        .insights-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .insight-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .insight-card:hover {
+            border-color: rgba(99, 102, 241, 0.3);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .insight-icon {
+            font-size: 2rem;
+            margin-bottom: 16px;
+        }
+
+        .insight-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .insight-text {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
             line-height: 1.5;
         }
-        
+
         /* Footer */
         footer {
             margin-top: 60px;
-            padding-top: 30px;
-            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
             text-align: center;
+        }
+
+        .footer-brand {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, var(--primary-light), #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .footer-text {
             color: var(--text-muted);
             font-size: 0.85rem;
         }
-        
-        footer a {
-            color: var(--gradient-1);
-        }
-        
+
         /* Responsive */
+        @media (max-width: 1200px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .insights-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
-            body {
-                padding: 20px;
+            .container {
+                padding: 20px 16px;
             }
-            
-            header {
+
+            .header {
                 flex-direction: column;
-                gap: 20px;
-                text-align: center;
+                gap: 24px;
             }
-            
-            h1 {
+
+            .header-badge {
+                align-items: flex-start;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stat-value {
+                font-size: 2.5rem;
+            }
+
+            .brand-text h1 {
                 font-size: 1.8rem;
             }
-            
-            .stat-val {
-                font-size: 2.2rem;
-            }
-            
-            .topic-name {
-                min-width: auto;
-                font-size: 0.85rem;
-            }
-            
-            .bar-container {
-                display: none;
+
+            .section {
+                padding: 20px;
+                border-radius: 16px;
             }
         }
     </style>
 </head>
+
 <body>
+    <div class="bg-gradient"></div>
+
     <div class="container">
-        <header>
-            <div class="logo">
-                <div class="logo-icon">🔍</div>
-                <div>
+        <header class="header">
+            <div class="brand">
+                <div class="brand-icon">🎯</div>
+                <div class="brand-text">
                     <h1>{{ competitor }}</h1>
-                    <div class="subtitle">Market Intelligence Report by Churn Scout</div>
+                    <p>Market Intelligence Report by Churn Scout</p>
                 </div>
             </div>
-            <div class="badge">Zero-API Analysis</div>
+            <div class="header-badge">
+                <div class="badge">🤖 AI-Powered Analysis</div>
+                <div class="badge-secondary">Zero API Keys Required</div>
+            </div>
         </header>
 
-        <div class="grid">
-            <div class="card">
-                <div class="stat-label">Churn Signals Detected</div>
-                <div class="stat-val">{{ total }}</div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Churn Signals</div>
+                <div class="stat-value">{{ total }}</div>
+                <div class="stat-trend negative">⚠️ Negative sentiment detected</div>
             </div>
-            <div class="card">
-                <div class="stat-label">Average Sentiment Score</div>
-                <div class="stat-val danger">{{ sentiment }}</div>
+
+            <div class="stat-card danger">
+                <div class="stat-label">Avg. Sentiment</div>
+                <div class="stat-value danger">{{ sentiment }}</div>
+                <div class="stat-trend">Scale: -1 (hate) to +1 (love)</div>
             </div>
-            <div class="card">
-                <div class="stat-label">Top Pain Point</div>
-                <div class="stat-val small">
-                    {% if topics %}{{ topics.keys() | list | first }}{% else %}None Detected{% endif %}
+
+            <div class="stat-card">
+                <div class="stat-label">Pain Categories</div>
+                <div class="stat-value">{{ topics|length }}</div>
+                <div class="stat-trend">ML-clustered topics</div>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-label">#1 Pain Point</div>
+                <div class="stat-value small">
+                    {% if topics %}{{ topics.keys() | list | first | replace('Issue: ', '') }}{% else %}None{% endif %}
+                </div>
+                <div class="stat-trend">Most mentioned issue</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="icon">🔥</span>
+                    <span>Critical Pain Points</span>
                 </div>
             </div>
-        </div>
 
-        <div class="card">
-            <div class="section-title">
-                <span>🔥</span>
-                <span>Critical Issues (Clustered by ML)</span>
-            </div>
-            <ul class="topics-list">
+            <div class="pain-points">
+                {% set rank = namespace(value=1) %}
                 {% for topic, count in topics.items() %}
-                <li>
-                    <span class="topic-name">{{ topic }}</span>
-                    <div class="bar-container">
-                        <div class="bar-fill" style="width: {{ (count / total * 100) | int }}%"></div>
+                <div class="pain-point">
+                    <div class="pain-rank">{{ rank.value }}</div>
+                    <div class="pain-info">
+                        <div class="pain-name">{{ topic }}</div>
+                        <div class="pain-bar-bg">
+                            <div class="pain-bar" style="width: {{ (count / total * 100) | int }}%"></div>
+                        </div>
                     </div>
-                    <span class="topic-count">{{ count }} reports</span>
-                </li>
+                    <div class="pain-count">{{ count }} reports</div>
+                </div>
+                {% set rank.value = rank.value + 1 %}
                 {% endfor %}
-            </ul>
+            </div>
         </div>
 
-        <div class="card" style="margin-top: 30px;">
-            <div class="section-title">
-                <span>💬</span>
-                <span>Raw Evidence</span>
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="icon">💬</span>
+                    <span>Customer Complaints Evidence</span>
+                </div>
             </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th width="20%">Topic</th>
-                            <th width="60%">Complaint Snippet</th>
-                            <th width="10%">Score</th>
-                            <th width="10%">Source</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in records %}
-                        <tr>
-                            <td><span class="topic-tag">{{ row.topic }}</span></td>
-                            <td class="complaint-text">
-                                {{ row.text[:150] }}{% if row.text|length > 150 %}...{% endif %}
-                            </td>
-                            <td class="sentiment-score">{{ "%.2f"|format(row.polarity) }}</td>
-                            <td><a href="{{ row.url }}" target="_blank" rel="noopener">View →</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+            <table class="evidence-table">
+                <thead>
+                    <tr>
+                        <th width="18%">Category</th>
+                        <th width="52%">Complaint</th>
+                        <th width="12%">Sentiment</th>
+                        <th width="18%">Source</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in records %}
+                    <tr>
+                        <td><span class="topic-badge">{{ row.topic | replace('Issue: ', '') | truncate(25) }}</span>
+                        </td>
+                        <td class="complaint-text">{{ row.text[:180] }}{% if row.text|length > 180 %}...{% endif %}</td>
+                        <td><span class="sentiment-score negative">{{ "%.2f"|format(row.polarity) }}</span></td>
+                        <td><a href="{{ row.url }}" target="_blank" rel="noopener" class="link-btn">View →</a></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <div class="section-header">
+                <div class="section-title">
+                    <span class="icon">💡</span>
+                    <span>Strategic Insights</span>
+                </div>
+            </div>
+
+            <div class="insights-grid">
+                <div class="insight-card">
+                    <div class="insight-icon">🎯</div>
+                    <div class="insight-title">Target Pain Points</div>
+                    <div class="insight-text">Focus your marketing on solving the top complaints. Customers are actively
+                        looking for alternatives.</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-icon">💰</div>
+                    <div class="insight-title">Pricing Opportunity</div>
+                    <div class="insight-text">{% if 'expensive' in (topics.keys()|list|join(' ')|lower) or 'price' in
+                        (topics.keys()|list|join(' ')|lower) %}Pricing is a major concern. Consider competitive pricing
+                        strategy.{% else %}Pricing is not a major concern for this competitor's users.{% endif %}</div>
+                </div>
+                <div class="insight-card">
+                    <div class="insight-icon">🚀</div>
+                    <div class="insight-title">Quick Win</div>
+                    <div class="insight-text">Create comparison content targeting "{{ competitor }} alternatives" - high
+                        intent keywords.</div>
+                </div>
             </div>
         </div>
 
         <footer>
-            <p>Generated by <strong>Churn Scout</strong> — Your AI-Powered Market Intelligence Agent</p>
-            <p>Powered by Playwright + Scikit-Learn • Zero API Keys Required</p>
+            <div class="footer-brand">Churn Scout</div>
+            <p class="footer-text">AI-Powered Market Intelligence • Scikit-Learn ML Clustering • Zero API Keys Required
+            </p>
         </footer>
     </div>
 </body>
+
 </html>
