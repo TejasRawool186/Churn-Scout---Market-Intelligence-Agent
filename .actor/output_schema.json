@@ -1,10 +1,11 @@
 {
     "actorOutputSchemaVersion": 1,
-    "fields": {
+    "type": "object",
+    "properties": {
         "topic": {
             "type": "string",
             "title": "Pain Point Topic",
-            "description": "The clustered category of the complaint (e.g., 'Issue: PRICING, EXPENSIVE, COST')"
+            "description": "The clustered category of the complaint"
         },
         "text": {
             "type": "string",
@@ -19,12 +20,12 @@
         "url": {
             "type": "string",
             "title": "Source URL",
-            "description": "Link to the original Reddit post or comment"
+            "description": "Link to the original Reddit post"
         },
         "dashboard_url": {
             "type": "string",
             "title": "Dashboard URL",
-            "description": "Link to the interactive HTML intelligence dashboard"
+            "description": "Link to the interactive HTML dashboard"
         }
     }
 }
