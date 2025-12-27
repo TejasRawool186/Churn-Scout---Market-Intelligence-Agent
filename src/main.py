@@ -60,9 +60,11 @@ async def scrape_reddit_json(query, limit):
         f"https://www.reddit.com/search.json?q={encoded_query}&sort=new&limit={min(100, limit)}&t=year",
     ]
     
+    # Reddit requires a specific User-Agent format to avoid 403
     headers = {
-        'User-Agent': random.choice(USER_AGENTS),
+        'User-Agent': 'ChurnScout/1.0 (Market Intelligence Bot; +https://apify.com)',
         'Accept': 'application/json',
+        'Accept-Language': 'en-US,en;q=0.9',
     }
     
     print("🌐 Fetching from Reddit JSON API...")
@@ -336,14 +338,25 @@ async def main():
         output_df = intel_df[['text', 'topic', 'polarity', 'url']].copy()
         await Actor.push_data(output_df.to_dict(orient='records'))
         
-        # Generate Public Link
-        kvs_id = Actor.get_env()['defaultKeyValueStoreId']
-        url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT_DASHBOARD"
-        
-        print(f"🚀 INTELLIGENCE REPORT READY: {url}")
-        
-        # Output URL to Dataset for easy access
-        await Actor.push_data({"dashboard_url": url})
+        # Generate Public Link using proper Apify SDK method
+        try:
+            store = await Actor.open_key_value_store()
+            store_info = store.get_info()
+            if store_info and hasattr(store_info, 'id'):
+                kvs_id = store_info.id
+            else:
+                # Fallback: get from environment
+                import os
+                kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'default')
+            
+            url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT_DASHBOARD"
+            print(f"🚀 INTELLIGENCE REPORT READY: {url}")
+            
+            # Output URL to Dataset for easy access
+            await Actor.push_data({"dashboard_url": url})
+        except Exception as e:
+            print(f"⚠️ Could not generate dashboard URL: {e}")
+            await Actor.push_data({"dashboard_url": "See OUTPUT_DASHBOARD in Key-Value Store"})
 
 if __name__ == '__main__':
     asyncio.run(main())
