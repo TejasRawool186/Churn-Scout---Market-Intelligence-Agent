@@ -619,10 +619,64 @@
             <div class="section-header">
                 <div class="section-title">
                     <span class="icon">💡</span>
-                    <span>Strategic Insights</span>
+                    <span>{% if ai_insights %}AI-Powered{% endif %} Strategic Insights</span>
+                </div>
+                {% if ai_insights %}
+                <div class="badge">🤖 AI Enhanced</div>
+                {% endif %}
+            </div>
+
+            {% if ai_insights %}
+            <!-- AI-GENERATED INSIGHTS -->
+            <div
+                style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(168, 85, 247, 0.1)); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: 16px; padding: 24px; margin-bottom: 24px;">
+                <div style="font-weight: 700; margin-bottom: 12px; color: var(--primary-light);">📋 Executive Summary
+                </div>
+                <div style="color: var(--text-primary); line-height: 1.7;">{{ ai_insights.executive_summary }}</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+                <div class="insight-card"
+                    style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2);">
+                    <div class="insight-icon">🎯</div>
+                    <div class="insight-title" style="color: var(--success);">Top Opportunities</div>
+                    <ul style="color: var(--text-secondary); font-size: 0.9rem; padding-left: 18px; margin: 0;">
+                        {% for opp in ai_insights.top_opportunities %}
+                        <li style="margin-bottom: 8px;">{{ opp }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <div class="insight-card"
+                    style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2);">
+                    <div class="insight-icon">⚡</div>
+                    <div class="insight-title" style="color: var(--warning);">Quick Wins</div>
+                    <ul style="color: var(--text-secondary); font-size: 0.9rem; padding-left: 18px; margin: 0;">
+                        {% for win in ai_insights.quick_wins %}
+                        <li style="margin-bottom: 8px;">{{ win }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
             </div>
 
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px;">
+                <div class="insight-card">
+                    <div class="insight-icon">🎪</div>
+                    <div class="insight-title">Recommended Positioning</div>
+                    <div class="insight-text">{{ ai_insights.recommended_positioning }}</div>
+                </div>
+
+                <div class="insight-card" style="text-align: center;">
+                    <div class="insight-icon">⚠️</div>
+                    <div class="insight-title">Disruption Risk</div>
+                    <div
+                        style="font-size: 1.5rem; font-weight: 800; color: {% if ai_insights.risk_level == 'HIGH' %}var(--danger){% elif ai_insights.risk_level == 'MEDIUM' %}var(--warning){% else %}var(--success){% endif %};">
+                        {{ ai_insights.risk_level }}</div>
+                    <div class="insight-text">Competitor vulnerability</div>
+                </div>
+            </div>
+            {% else %}
+            <!-- ML-ONLY INSIGHTS (No API key provided) -->
             <div class="insights-grid">
                 <div class="insight-card">
                     <div class="insight-icon">🎯</div>
@@ -644,11 +698,17 @@
                         intent keywords.</div>
                 </div>
             </div>
+            <div
+                style="text-align: center; margin-top: 20px; padding: 16px; background: rgba(255,255,255,0.03); border-radius: 12px; color: var(--text-muted); font-size: 0.85rem;">
+                💡 <strong>Tip:</strong> Add your API key (Gemini/OpenAI/OpenRouter) for AI-enhanced strategic insights
+            </div>
+            {% endif %}
         </div>
 
         <footer>
             <div class="footer-brand">Churn Scout</div>
-            <p class="footer-text">AI-Powered Market Intelligence • Scikit-Learn ML Clustering • Zero API Keys Required
+            <p class="footer-text">AI-Powered Market Intelligence • Scikit-Learn ML Clustering{% if not ai_insights %} •
+                Add API Key for Enhanced Insights{% endif %}
             </p>
         </footer>
     </div>

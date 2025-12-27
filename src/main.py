@@ -12,6 +12,9 @@ from urllib.parse import quote
 import re
 import os
 
+# Import AI provider
+from ai_provider import generate_ai_insights, detect_provider
+
 # --- STEALTH CONFIG ---
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -279,7 +282,7 @@ def analyze_market_intel(data):
     return churn_df
 
 # --- PART 3: THE DASHBOARD GENERATOR ---
-def generate_dashboard(competitor, df):
+def generate_dashboard(competitor, df, ai_insights=None):
     # Setup Jinja Environment
     env = Environment(loader=FileSystemLoader('src/templates'))
     template = env.get_template('dashboard.html')
@@ -296,7 +299,8 @@ def generate_dashboard(competitor, df):
         total=total_analyzed,
         sentiment=avg_sentiment,
         topics=topics,
-        records=df.head(50).to_dict(orient='records')
+        records=df.head(50).to_dict(orient='records'),
+        ai_insights=ai_insights
     )
 
 # --- MAIN ORCHESTRATOR ---
@@ -306,9 +310,16 @@ async def main():
         competitor = inputs.get('competitorName', 'Jira')
         limit = inputs.get('maxPosts', 100)
         proxy = inputs.get('proxyConfiguration')
+        api_key = inputs.get('apiKey', '')
 
         print(f"🎯 Target: {competitor}")
         print(f"📊 Sample Size: {limit}")
+        
+        if api_key:
+            provider = detect_provider(api_key)
+            print(f"🤖 AI Provider: {provider.upper() if provider else 'None'}")
+        else:
+            print("ℹ️ No API key provided - using ML-only analysis")
 
         # 1. Scrape
         raw_data = await scrape_reddit(competitor, limit, proxy)
@@ -327,9 +338,24 @@ async def main():
             print("✅ Competitor is clean. No major complaints found.")
             await Actor.push_data({"status": "Clean", "message": "Zero negative signals."})
             return
+        
+        # Calculate stats for AI
+        topics = intel_df['topic'].value_counts().head(5).to_dict() if not intel_df.empty else {}
+        avg_sentiment = round(intel_df['polarity'].mean(), 2) if not intel_df.empty else 0
+        complaints = intel_df['text'].tolist()[:20]
+        
+        # 3. Generate AI Insights (if API key provided)
+        ai_insights = None
+        if api_key:
+            print("🧠 Generating AI-powered strategic insights...")
+            ai_insights = await generate_ai_insights(api_key, competitor, topics, avg_sentiment, complaints)
+            if ai_insights:
+                print("✅ AI insights generated successfully")
+            else:
+                print("⚠️ AI insights failed, using ML-only analysis")
 
-        # 3. Report
-        html = generate_dashboard(competitor, intel_df)
+        # 4. Generate Report
+        html = generate_dashboard(competitor, intel_df, ai_insights)
         
         # Save HTML to KVS - use 'OUTPUT' key for direct visibility in Output tab
         await Actor.set_value('OUTPUT', html, content_type='text/html')
@@ -342,7 +368,6 @@ async def main():
         await Actor.push_data(output_df.to_dict(orient='records'))
         
         # Generate Public Link using environment variable
-        import os
         kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'unknown')
         url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT"
         print(f"🚀 INTELLIGENCE REPORT READY: {url}")

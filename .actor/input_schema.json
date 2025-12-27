@@ -18,6 +18,13 @@
             "minimum": 50,
             "maximum": 500
         },
+        "apiKey": {
+            "title": "Your API Key (Gemini/OpenAI/OpenRouter)",
+            "type": "string",
+            "description": "Optional: Enter your API key for AI-enhanced insights. Leave empty for ML-only analysis. Supports: Gemini, OpenAI GPT, or OpenRouter keys.",
+            "editor": "textfield",
+            "isSecret": true
+        },
         "proxyConfiguration": {
             "title": "Proxy Settings",
             "type": "object",
