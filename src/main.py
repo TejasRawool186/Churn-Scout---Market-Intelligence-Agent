@@ -55,14 +55,11 @@ async def scrape_hackernews(query, limit):
     Great for tech product complaints and discussions.
     """
     results = []
-    search_terms = f'{query} (problem OR expensive OR alternative OR hate OR bug OR issue)'
+    search_terms = f'{query} problem OR issue OR hate OR bad OR expensive OR alternative OR switch'
     encoded_query = quote(search_terms)
     
-    # Algolia HN Search API - completely public
-    urls = [
-        f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=story&hitsPerPage={min(50, limit)}",
-        f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=comment&hitsPerPage={min(50, limit)}",
-    ]
+    # Algolia HN Search API - completely public, sorted by relevance
+    url = f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=(story,comment)&hitsPerPage={min(100, limit * 2)}"
     
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
@@ -72,44 +69,53 @@ async def scrape_hackernews(query, limit):
     print("🟠 Fetching from Hacker News (Algolia API)...")
     
     async with aiohttp.ClientSession() as session:
-        for url in urls:
-            if len(results) >= limit:
-                break
-                
-            try:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        hits = data.get('hits', [])
+        try:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    hits = data.get('hits', [])
+                    
+                    print(f"📥 Found {len(hits)} items from Hacker News")
+                    
+                    for hit in hits:
+                        if len(results) >= limit:
+                            break
                         
-                        print(f"📥 Found {len(hits)} items from Hacker News")
+                        # Extract rich data
+                        title = hit.get('title', '')
+                        comment_text = hit.get('comment_text', '') or ''
+                        story_text = hit.get('story_text', '') or ''
+                        object_id = hit.get('objectID', '')
+                        points = hit.get('points', 0) or hit.get('num_comments', 0) or 0
+                        author = hit.get('author', 'anonymous')
+                        created_at = hit.get('created_at', '')[:10] if hit.get('created_at') else 'Unknown'
                         
-                        for hit in hits:
-                            if len(results) >= limit:
-                                break
-                            
-                            title = hit.get('title', '') or hit.get('comment_text', '')[:200]
-                            story_text = hit.get('story_text', '') or ''
-                            object_id = hit.get('objectID', '')
-                            
-                            text = f"{title} {story_text[:150]}".strip()
-                            
-                            if text and len(text) > 15:
-                                results.append({
-                                    "text": text,
-                                    "url": f"https://news.ycombinator.com/item?id={object_id}",
-                                    "source": "Hacker News"
-                                })
+                        # Clean and combine text
+                        if comment_text:
+                            # For comments, clean HTML tags
+                            import re
+                            clean_text = re.sub(r'<[^>]+>', ' ', comment_text)
+                            text = clean_text[:300].strip()
+                        else:
+                            text = f"{title} {story_text[:200]}".strip()
                         
-                        await asyncio.sleep(0.5)
-                        
-                    else:
-                        print(f"⚠️ HN API returned status {response.status}")
-                        
-            except asyncio.TimeoutError:
-                print("⚠️ HN API request timed out")
-            except Exception as e:
-                print(f"⚠️ HN API error: {e}")
+                        # Filter out very short or irrelevant content
+                        if text and len(text) > 25 and query.lower() in text.lower():
+                            results.append({
+                                "text": text,
+                                "url": f"https://news.ycombinator.com/item?id={object_id}",
+                                "source": "Hacker News",
+                                "date": created_at,
+                                "engagement": points,
+                                "author": author
+                            })
+                else:
+                    print(f"⚠️ HN API returned status {response.status}")
+                    
+        except asyncio.TimeoutError:
+            print("⚠️ HN API request timed out")
+        except Exception as e:
+            print(f"⚠️ HN API error: {e}")
     
     print(f"📊 Collected {len(results)} signals from Hacker News")
     return results
@@ -121,14 +127,14 @@ async def scrape_github_issues(query, limit):
     Great for finding bug reports and feature complaints.
     """
     results = []
-    search_terms = f'{query} bug OR issue OR problem OR broken'
+    search_terms = f'{query} bug OR issue OR problem OR broken OR slow OR crash'
     encoded_query = quote(search_terms)
     
-    # GitHub public search API
-    url = f"https://api.github.com/search/issues?q={encoded_query}&sort=created&order=desc&per_page={min(30, limit)}"
+    # GitHub public search API - sorted by most recent
+    url = f"https://api.github.com/search/issues?q={encoded_query}&sort=created&order=desc&per_page={min(50, limit)}"
     
     headers = {
-        'User-Agent': random.choice(USER_AGENTS),
+        'User-Agent': 'ChurnScout/1.0',
         'Accept': 'application/vnd.github.v3+json',
     }
     
@@ -145,16 +151,33 @@ async def scrape_github_issues(query, limit):
                     
                     for item in items[:limit]:
                         title = item.get('title', '')
-                        body = (item.get('body', '') or '')[:200]
+                        body = (item.get('body', '') or '')[:250]
                         html_url = item.get('html_url', '')
+                        created_at = item.get('created_at', '')[:10] if item.get('created_at') else 'Unknown'
+                        comments = item.get('comments', 0)
+                        state = item.get('state', 'open')
+                        labels = [l.get('name', '') for l in item.get('labels', [])[:3]]
+                        
+                        # Extract repo name from URL
+                        repo_name = ''
+                        if html_url:
+                            parts = html_url.split('/')
+                            if len(parts) >= 5:
+                                repo_name = f"{parts[3]}/{parts[4]}"
                         
                         text = f"{title} {body}".strip()
                         
-                        if text and len(text) > 15:
+                        # Filter by relevance
+                        if text and len(text) > 25 and query.lower() in text.lower():
                             results.append({
                                 "text": text,
                                 "url": html_url or "https://github.com",
-                                "source": "GitHub Issues"
+                                "source": "GitHub Issues",
+                                "date": created_at,
+                                "engagement": comments,
+                                "repo": repo_name,
+                                "status": state,
+                                "labels": ', '.join(labels) if labels else 'none'
                             })
                             
                 elif response.status == 403:

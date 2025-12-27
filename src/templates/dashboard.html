@@ -389,6 +389,16 @@
             color: var(--danger-light);
         }
 
+        .sentiment-score.neutral {
+            background: rgba(156, 163, 175, 0.15);
+            color: var(--text-secondary);
+        }
+
+        .sentiment-score.positive {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+        }
+
         .link-btn {
             display: inline-flex;
             align-items: center;
@@ -588,26 +598,50 @@
             <div class="section-header">
                 <div class="section-title">
                     <span class="icon">💬</span>
-                    <span>Customer Complaints Evidence</span>
+                    <span>Market Signals Evidence</span>
                 </div>
+                <div style="color: var(--text-muted); font-size: 0.85rem;">Real data from Hacker News & GitHub</div>
             </div>
 
             <table class="evidence-table">
                 <thead>
                     <tr>
-                        <th width="18%">Category</th>
-                        <th width="52%">Complaint</th>
-                        <th width="12%">Sentiment</th>
-                        <th width="18%">Source</th>
+                        <th width="12%">Category</th>
+                        <th width="45%">Signal / Complaint</th>
+                        <th width="10%">Sentiment</th>
+                        <th width="12%">Source</th>
+                        <th width="10%">Date</th>
+                        <th width="11%">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in records %}
                     <tr>
-                        <td><span class="topic-badge">{{ row.topic | replace('Issue: ', '') | truncate(25) }}</span>
+                        <td><span class="topic-badge">{{ row.topic | replace('Issue: ', '') | truncate(20) }}</span>
                         </td>
-                        <td class="complaint-text">{{ row.text[:180] }}{% if row.text|length > 180 %}...{% endif %}</td>
-                        <td><span class="sentiment-score negative">{{ "%.2f"|format(row.polarity) }}</span></td>
+                        <td class="complaint-text">
+                            <div style="font-weight: 500; margin-bottom: 4px;">{{ row.text[:160] }}{% if row.text|length
+                                > 160 %}...{% endif %}</div>
+                            {% if row.source == 'GitHub Issues' and row.repo %}
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">📦 {{ row.repo }} {% if
+                                row.labels and row.labels != 'none' %}• 🏷️ {{ row.labels }}{% endif %}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span
+                                class="sentiment-score {% if row.polarity < -0.3 %}negative{% elif row.polarity > 0.3 %}positive{% else %}neutral{% endif %}">
+                                {{ "%.2f"|format(row.polarity) }}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                {% if row.source == 'Hacker News' %}🟠{% elif row.source == 'GitHub Issues' %}🐙{% else
+                                %}📊{% endif %}
+                                <span style="font-size: 0.8rem;">{{ row.source | replace(' Issues', '') }}</span>
+                            </div>
+                        </td>
+                        <td style="color: var(--text-muted); font-size: 0.8rem;">{{ row.date if row.date else 'N/A' }}
+                        </td>
                         <td><a href="{{ row.url }}" target="_blank" rel="noopener" class="link-btn">View →</a></td>
                     </tr>
                     {% endfor %}
