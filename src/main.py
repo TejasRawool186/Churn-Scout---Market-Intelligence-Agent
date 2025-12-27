@@ -1,6 +1,7 @@
 import asyncio
 import pandas as pd
 import random
+import aiohttp
 from apify import Actor
 from playwright.async_api import async_playwright
 from textblob import TextBlob
@@ -19,106 +20,144 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
 ]
 
-# --- PART 1: THE SCRAPER ---
+# --- PART 1: THE SCRAPER (Using Reddit JSON API) ---
 async def scrape_reddit(query, limit, proxy_config):
     """
-    Browses Reddit search using Playwright with retry logic.
-    Uses old.reddit.com for better scraping compatibility.
+    Scrapes Reddit search using the public JSON API (much faster and reliable).
+    Falls back to Playwright only if JSON API fails.
     """
     print(f"🕵️‍♂️ Deploying Scout for: {query}...")
     results = []
     
-    # Setup Proxy (Crucial for scraping)
+    # Try Reddit JSON API first (fast, no browser needed)
+    results = await scrape_reddit_json(query, limit)
+    
+    # Fallback to Playwright if JSON API fails
+    if not results:
+        print("⚠️ JSON API failed, trying Playwright fallback...")
+        results = await scrape_reddit_playwright(query, limit, proxy_config)
+    
+    # Final fallback: sample data for demo purposes
+    if not results:
+        print("⚠️ No live data found. Using sample market intelligence data...")
+        results = generate_sample_data(query, min(20, limit))
+    
+    return results
+
+
+async def scrape_reddit_json(query, limit):
+    """
+    Uses Reddit's public JSON API for fast, reliable scraping.
+    No authentication needed for public search.
+    """
+    results = []
+    search_terms = f'{query} (problem OR expensive OR alternative OR hate OR frustrating)'
+    encoded_query = quote(search_terms)
+    
+    # Reddit JSON endpoints
+    urls = [
+        f"https://www.reddit.com/search.json?q={encoded_query}&sort=relevance&limit={min(100, limit)}&t=all",
+        f"https://www.reddit.com/search.json?q={encoded_query}&sort=new&limit={min(100, limit)}&t=year",
+    ]
+    
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS),
+        'Accept': 'application/json',
+    }
+    
+    print("🌐 Fetching from Reddit JSON API...")
+    
+    async with aiohttp.ClientSession() as session:
+        for url in urls:
+            if len(results) >= limit:
+                break
+                
+            try:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        posts = data.get('data', {}).get('children', [])
+                        
+                        print(f"📥 Found {len(posts)} posts from Reddit API")
+                        
+                        for post in posts:
+                            if len(results) >= limit:
+                                break
+                            
+                            post_data = post.get('data', {})
+                            title = post_data.get('title', '')
+                            selftext = post_data.get('selftext', '')[:200]  # Limit text length
+                            permalink = post_data.get('permalink', '')
+                            
+                            text = f"{title} {selftext}".strip()
+                            
+                            if text and len(text) > 15:
+                                results.append({
+                                    "text": text,
+                                    "url": f"https://reddit.com{permalink}" if permalink else "https://reddit.com",
+                                    "source": "Reddit"
+                                })
+                        
+                        # Small delay between requests
+                        await asyncio.sleep(1)
+                        
+                    elif response.status == 429:
+                        print("⚠️ Rate limited by Reddit API, waiting...")
+                        await asyncio.sleep(5)
+                    else:
+                        print(f"⚠️ Reddit API returned status {response.status}")
+                        
+            except asyncio.TimeoutError:
+                print("⚠️ Reddit API request timed out")
+            except Exception as e:
+                print(f"⚠️ Reddit API error: {e}")
+    
+    print(f"📊 Collected {len(results)} signals from JSON API")
+    return results
+
+
+async def scrape_reddit_playwright(query, limit, proxy_config):
+    """
+    Fallback: Uses Playwright browser for scraping (slower, may timeout).
+    Only used if JSON API fails.
+    """
+    print("🔄 Using Playwright browser fallback...")
+    results = []
+    
+    # Setup Proxy
     proxy_url = None
     if proxy_config:
         try:
             proxy_info = await Actor.create_proxy_configuration(actor_proxy_input=proxy_config)
             if proxy_info:
                 proxy_url = await proxy_info.new_url()
-                print(f"🔒 Proxy configured successfully")
+                print(f"🔒 Proxy configured")
         except Exception as e:
             print(f"⚠️ Proxy setup warning: {e}")
 
-    async with async_playwright() as p:
-        # Launch Headless Chrome with stealth settings
-        browser = await p.chromium.launch(
-            headless=True,
-            args=[
-                '--disable-blink-features=AutomationControlled',
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-            ],
-            proxy={"server": proxy_url} if proxy_url else None
-        )
-        
-        # Randomize User Agent
-        user_agent = random.choice(USER_AGENTS)
-        context = await browser.new_context(
-            user_agent=user_agent,
-            viewport={'width': 1920, 'height': 1080},
-            locale='en-US',
-            timezone_id='America/New_York',
-        )
-        
-        # Add stealth scripts
-        await context.add_init_script("""
-            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-        """)
-        
-        page = await context.new_page()
-
-        # Use old.reddit.com (more scraper-friendly, lighter page)
-        search_query = quote(f'{query} (problem OR expensive OR alternative OR hate OR frustrating)')
-        url = f"https://old.reddit.com/search?q={search_query}&sort=relevance&t=all"
-        
-        print(f"🌐 Navigating to Reddit search...")
-        
-        # Retry logic
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                # Navigate with longer timeout and domcontentloaded event
-                await page.goto(url, timeout=60000, wait_until='domcontentloaded')
-                
-                # Random delay to appear human
-                await page.wait_for_timeout(random.randint(2000, 4000))
-                
-                # Check if we got blocked
-                content = await page.content()
-                if "too many requests" in content.lower() or "rate limit" in content.lower():
-                    print(f"⚠️ Rate limited, waiting before retry {attempt + 1}/{max_retries}...")
-                    await page.wait_for_timeout(5000)
-                    continue
-                
-                print(f"✅ Page loaded successfully on attempt {attempt + 1}")
-                break
-                
-            except Exception as e:
-                print(f"⚠️ Navigation attempt {attempt + 1} failed: {e}")
-                if attempt < max_retries - 1:
-                    await page.wait_for_timeout(3000)
-                continue
-        
-        try:
-            # Scroll to load more content
-            for i in range(3):
-                await page.mouse.wheel(0, 2000)
-                await page.wait_for_timeout(random.randint(1000, 2000))
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--disable-blink-features=AutomationControlled', '--no-sandbox'],
+                proxy={"server": proxy_url} if proxy_url else None
+            )
             
-            # Extract posts from old.reddit.com structure
-            # Old Reddit uses different selectors
+            context = await browser.new_context(
+                user_agent=random.choice(USER_AGENTS),
+                viewport={'width': 1920, 'height': 1080},
+            )
+            
+            page = await context.new_page()
+            
+            search_query = quote(f'{query} (problem OR expensive OR alternative)')
+            url = f"https://old.reddit.com/search?q={search_query}&sort=relevance&t=all"
+            
+            # Shorter timeout for fallback
+            await page.goto(url, timeout=30000, wait_until='domcontentloaded')
+            await page.wait_for_timeout(2000)
+            
             post_links = await page.locator('a.search-title').all()
-            
-            if not post_links:
-                # Fallback: try alternative selectors
-                post_links = await page.locator('.search-result a.search-link').all()
-            
-            if not post_links:
-                # Another fallback for different page structure
-                post_links = await page.locator('.thing .title a').all()
-            
-            print(f"📥 Found {len(post_links)} potential signals")
             
             for post in post_links[:limit]:
                 try:
@@ -126,10 +165,8 @@ async def scrape_reddit(query, limit, proxy_config):
                     link = await post.get_attribute('href')
                     
                     if text and len(text) > 15:
-                        # Ensure full URL
                         if link and not link.startswith('http'):
                             link = f"https://old.reddit.com{link}"
-                        
                         results.append({
                             "text": text.strip(),
                             "url": link or "https://reddit.com",
@@ -138,19 +175,13 @@ async def scrape_reddit(query, limit, proxy_config):
                 except Exception:
                     continue
             
-            print(f"📊 Extracted {len(results)} valid signals")
+            await browser.close()
             
-        except Exception as e:
-            print(f"⚠️ Extraction Error: {e}")
-        
-        await browser.close()
-    
-    # If Reddit scraping fails, use fallback demo data for testing
-    if not results:
-        print("⚠️ No live data found. Using sample market intelligence data...")
-        results = generate_sample_data(query, min(20, limit))
+    except Exception as e:
+        print(f"⚠️ Playwright fallback failed: {e}")
     
     return results
+
 
 def generate_sample_data(competitor, count):
     """Generate sample churn signals for demo purposes when scraping fails."""

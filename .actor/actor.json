@@ -9,6 +9,7 @@
         "templateId": "python-playwright"
     },
     "input": "./input_schema.json",
+    "output": "./output_schema.json",
     "dockerfile": "../Dockerfile",
     "storages": {
         "dataset": {
@@ -18,7 +19,12 @@
                 "overview": {
                     "title": "Churn Signals Overview",
                     "transformation": {
-                        "fields": ["topic", "text", "polarity", "url"]
+                        "fields": [
+                            "topic",
+                            "text",
+                            "polarity",
+                            "url"
+                        ]
                     },
                     "display": {
                         "component": "table",

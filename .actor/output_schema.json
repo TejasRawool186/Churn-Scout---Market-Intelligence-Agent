@@ -1,0 +1,30 @@
+{
+    "actorSpecification": 1,
+    "fields": {
+        "topic": {
+            "type": "string",
+            "title": "Pain Point Topic",
+            "description": "The clustered category of the complaint (e.g., 'Issue: PRICING, EXPENSIVE, COST')"
+        },
+        "text": {
+            "type": "string",
+            "title": "Complaint Snippet",
+            "description": "The original text of the complaint or negative signal"
+        },
+        "polarity": {
+            "type": "number",
+            "title": "Sentiment Score",
+            "description": "Sentiment polarity from -1.0 (very negative) to 1.0 (very positive)"
+        },
+        "url": {
+            "type": "string",
+            "title": "Source URL",
+            "description": "Link to the original Reddit post or comment"
+        },
+        "dashboard_url": {
+            "type": "string",
+            "title": "Dashboard URL",
+            "description": "Link to the interactive HTML intelligence dashboard"
+        }
+    }
+}
