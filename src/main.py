@@ -12,8 +12,8 @@ from urllib.parse import quote
 import re
 import os
 
-# Import AI provider
-from ai_provider import generate_ai_insights, detect_provider
+# Import AI provider (use relative import since both in src/)
+from src.ai_provider import generate_ai_insights, detect_provider
 
 # --- STEALTH CONFIG ---
 USER_AGENTS = [
