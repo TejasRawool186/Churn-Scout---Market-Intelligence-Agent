@@ -1,6 +1,6 @@
 # 🔍 Churn Scout - Market Intelligence Agent
 
-> **Autonomous AI agent that reveals why customers are leaving your competitors**
+> **Autonomous AI-powered market intelligence agent that reveals why customers are leaving your competitors**
 
 [![Apify](https://img.shields.io/badge/Apify-Store-blue?style=for-the-badge&logo=apify)](https://apify.com/store)
 [![Python](https://img.shields.io/badge/Python-3.11-green?style=for-the-badge&logo=python)](https://python.org)
@@ -10,38 +10,45 @@
 
 ## 🎯 What is Churn Scout?
 
-Churn Scout is an **autonomous market intelligence agent** designed for **SaaS founders and marketing teams**. It automatically identifies why customers are leaving a competitor by analyzing public sentiment signals.
+Churn Scout is an **autonomous market intelligence agent** designed for **SaaS founders, product managers, and marketing teams**. It automatically crawls multiple public developer and social channels (Hacker News, GitHub Issues, DEV.to, StackOverflow) to identify customer frustrations and churn signals about a target competitor.
 
-Unlike traditional scrapers that simply dump raw text, Churn Scout uses an internal **Machine Learning Engine** to cluster thousands of complaints into specific **Pain Points** (e.g., "Pricing is too high," "Mobile app crashes").
+Unlike basic text-dumps, Churn Scout utilizes an internal **Machine Learning Engine** (Sentiment Analysis + TF-IDF Vectorization + K-Means Clustering) to group complaints into specific **Pain Point Categories** (e.g., "Pricing Issues", "Performance Problems"). It compiles these signals into a **premium, self-contained, interactive HTML dashboard** containing visualized metrics, client-side filters, and strategic competitor positioning plans.
 
-### ✨ Key Features
+---
 
-| Feature | Description |
-|---------|-------------|
-| 🤖 **Zero API Keys** | No OpenAI, no Gemini, no external AI costs |
-| 🧠 **ML-Powered Analysis** | Scikit-Learn clusters complaints into actionable topics |
-| 📊 **Beautiful Dashboard** | Self-contained HTML report with interactive insights |
-| 🔒 **Privacy-First** | Aggregates data, never stores PII |
-| ⚡ **Fast Insights** | Get competitor intelligence in minutes |
+## ✨ Features
+
+### 🎛️ Advanced Target Crawling
+- **Multi-Source Support**: Scrape Hacker News, GitHub Issues, DEV.to, and StackOverflow concurrently.
+- **Custom Keywords**: Append custom search phrases to look for specific complaints (e.g. "slow", "bug", "pricing").
+- **Resilient Architecture**: Automatic retries and exponential backoff handling rate limits gracefully.
+
+### 🧠 Intelligent Processing
+- **Sentiment Filtering**: Automatically filters out noise to target high-frustration indicators (polarity below a user-defined threshold).
+- **Automated Categorization**: Uses statistical NLP to cluster evidence into clear pain areas.
+- **AI Strategic Insights**: Add your API key (Gemini, OpenAI, or OpenRouter) to generate executive summaries, tactical roadmaps, and competitive pitches.
+
+### 📊 Premium Visual Dashboard
+- **Modern Aesthetics**: Built with a sleek dark-mode glassmorphic theme inspired by Stripe and Vercel dashboards.
+- **Interactive Visualizations**: Embedded Chart.js charts showing sentiment split and category frequency.
+- **Client-Side Search & Filters**: Live search over signal text and tabs to filter by platform or severity.
+- **Data Portability**: Clean export buttons to download filtered datasets directly to CSV or JSON.
 
 ---
 
 ## 🚀 How It Works
 
 ```mermaid
-graph LR
-    A[Input: Competitor Name] --> B[Playwright Scraper]
-    B --> C[Reddit Search]
-    C --> D[TextBlob Sentiment]
-    D --> E[TF-IDF + K-Means]
-    E --> F[Pain Point Clusters]
-    F --> G[Interactive Dashboard]
+graph TD
+    Input[Competitor Name & Settings] --> Scraper[Resilient Multi-Source API Scraper]
+    Scraper --> Sources[HN, GitHub, DEV.to, StackOverflow]
+    Sources --> Sentiment[TextBlob Sentiment Score]
+    Sentiment --> Filter[Sentiment & Noise Filter]
+    Filter --> ML[TF-IDF Vectorization + Clustering]
+    ML --> AI[AI Strategic Positioning Generator]
+    AI --> Dashboard[Interactive HTML Dashboard]
+    AI --> Dataset[Apify Dataset Output]
 ```
-
-1. **Visual Scraping**: Playwright navigates public Reddit search to find complaints
-2. **Sentiment Filtering**: TextBlob filters for negative sentiment (churn signals)
-3. **AI Clustering**: Scikit-Learn groups similar complaints into topics
-4. **Smart Reporting**: Generates a hosted HTML dashboard with actionable insights
 
 ---
 
@@ -49,17 +56,27 @@ graph LR
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| `competitorName` | String | The brand to analyze (e.g., "Notion", "Jira") | Required |
-| `maxPosts` | Integer | Sample size (50-500). Higher = more accurate | 100 |
-| `proxyConfiguration` | Object | Apify Proxy settings | Enabled |
+| `competitorName` | String | Target brand/product to analyze (e.g., `Zomato`, `Jira`, `Notion`) | *Required* |
+| `maxPosts` | Integer | Total signal sample size limit (50 - 500) | `100` |
+| `sources` | Array | Select platforms to scrape (`Hacker News`, `GitHub Issues`, `DEV.to`, `StackOverflow`) | *All selected* |
+| `minSentiment` | Number | Maximum sentiment score allowed (`-1.0` to `0.0`). Below `-0.05` filters out neutral comments. | `-0.05` |
+| `customKeywords` | String | Comma-separated list of custom words to include in search queries (e.g. `latency, pricing`) | `""` |
+| `apiKey` | String | Optional secret key for Gemini, OpenAI, or OpenRouter to unlock Strategic Insights | `""` |
+| `proxyConfiguration` | Object | Apify proxy settings to prevent request throttling | `{"useApifyProxy": true}` |
 
 ### Example Input
 
 ```json
 {
     "competitorName": "Slack",
-    "maxPosts": 200,
-    "proxyConfiguration": { "useApifyProxy": true }
+    "maxPosts": 150,
+    "sources": ["Hacker News", "GitHub Issues"],
+    "minSentiment": -0.1,
+    "customKeywords": "expensive, mobile app",
+    "apiKey": "YOUR_GEMINI_OR_OPENAI_API_KEY",
+    "proxyConfiguration": {
+        "useApifyProxy": true
+    }
 }
 ```
 
@@ -68,79 +85,37 @@ graph LR
 ## 📤 Output
 
 ### 1. Interactive Dashboard (HTML)
+Stored in the default Key-Value Store under the key `OUTPUT`. Contains:
+- **KPI Metrics**: Churn signal counts, Average Sentiment, Disruption vulnerability level.
+- **Visual Analytics**: Interactive bar charts (pain point frequencies) and doughnut charts (sentiment distribution).
+- **Tactical Strategy**: Positioning advice, immediate marketing options, and product differentiation opportunities.
+- **Raw Evidence Table**: Filterable, searchable, and sortable table of all scraped complaints.
 
-A beautiful, self-contained dashboard stored in the Key-Value Store:
-
-- 📊 **Churn Signal Count** - Total negative mentions found
-- 📉 **Average Sentiment** - Overall negativity score
-- 🏷️ **Pain Point Clusters** - AI-identified complaint categories
-- 📝 **Raw Evidence** - Original posts with source links
-
-### 2. Structured Dataset (JSON)
-
-```json
-[
-    {
-        "text": "Slack's pricing is ridiculous for small teams",
-        "topic": "ISSUE: PRICING, EXPENSIVE, TEAMS",
-        "polarity": -0.42,
-        "url": "https://reddit.com/r/..."
-    }
-]
-```
+### 2. Dataset Records (JSON / CSV)
+Includes structured metadata for every signal:
+- `topic`: Clustered pain point category.
+- `text`: Raw complaint text.
+- `polarity`: Raw sentiment polarity (-1.0 to 1.0).
+- `source`: The source site.
+- `date`: Scrape item publishing date.
+- `engagement`: Points, comments, or reaction count.
+- `url`: Link directly to the community thread.
 
 ---
 
 ## 🛠️ Technology Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| **Scraping** | Playwright | Visual browser automation |
-| **NLP** | TextBlob | Sentiment polarity analysis |
-| **ML** | Scikit-Learn | TF-IDF + K-Means clustering |
-| **Templating** | Jinja2 | Dashboard generation |
-| **Infrastructure** | Docker + Apify | Serverless execution |
+- **NLP**: TextBlob Polarity Scoring
+- **Machine Learning**: Scikit-Learn (TF-IDF Vectorizer, K-Means Clustering)
+- **Engine**: Python 3.11 + Apify SDK
+- **Visualization**: Jinja2 Templates, Chart.js, Lucide Icons
 
 ---
 
-## 💼 Use Cases
+## 🔒 Compliance & Safe Harbor Guidelines
 
-- 🎯 **Competitive Intelligence** - Understand competitor weaknesses
-- 📢 **Marketing Strategy** - Craft messaging that addresses pain points
-- 🛠️ **Product Development** - Build features competitors lack
-- 📈 **Sales Enablement** - Arm sales team with competitor objections
-
----
-
-## 📋 Compliance & Ethics
-
-✅ **Rate Limited** - Mimics human browsing speed  
-✅ **Public Data Only** - Only accesses reddit.com/search  
-✅ **No PII** - Aggregates into clusters, no individual targeting  
-✅ **Transformative** - Produces insights, not raw data dumps  
-
----
-
-## 💰 Pricing
-
-| Model | Price |
-|-------|-------|
-| **Recurring Rental** | $20/month |
-| **Pay-Per-Run** | $0.50/run |
-
----
-
-## 🤝 Support
-
-- 📧 Issues? Open a ticket on Apify
-- ⭐ Love it? Leave a review!
-
----
-
-<div align="center">
-
-**Built with ❤️ for the Apify Store**
-
-*Zero API Keys • Pure Machine Learning • Actionable Intelligence*
-
-</div>
+This Actor is built to operate under strict compliance criteria:
+- **Public Data Only**: Accesses public APIs and indexing paths without logging in.
+- **Rate Limit Adherence**: Employs query limits and backoff pauses to protect target servers.
+- **Privacy-First**: Focuses purely on product critique; strips PII and user-specific details.
+- **Transformative Utility**: Creates high-level aggregated strategic business intelligence.

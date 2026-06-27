@@ -18,6 +18,32 @@
             "minimum": 50,
             "maximum": 500
         },
+        "sources": {
+            "title": "Data Sources",
+            "type": "array",
+            "description": "Select public sources to extract customer signals from.",
+            "editor": "select",
+            "items": {
+                "type": "string",
+                "enum": ["Hacker News", "GitHub Issues", "DEV.to", "StackOverflow"]
+            },
+            "default": ["Hacker News", "GitHub Issues", "DEV.to", "StackOverflow"]
+        },
+        "minSentiment": {
+            "title": "Max Sentiment Score (Filter)",
+            "type": "number",
+            "description": "Only include signals below this sentiment threshold. 0.0 includes all neutral/negative, -0.2 targets high frustration.",
+            "default": -0.05,
+            "minimum": -1.0,
+            "maximum": 0.0
+        },
+        "customKeywords": {
+            "title": "Custom Search Keywords",
+            "type": "string",
+            "description": "Optional: Comma-separated extra terms to search alongside the competitor name.",
+            "editor": "textfield",
+            "prefill": ""
+        },
         "apiKey": {
             "title": "Your API Key (Gemini/OpenAI/OpenRouter)",
             "type": "string",

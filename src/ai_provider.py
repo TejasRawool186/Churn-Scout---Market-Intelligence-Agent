@@ -1,10 +1,11 @@
 """
 AI Provider Module - Supports Gemini, OpenAI, and OpenRouter
-Auto-detects provider based on API key format
+Auto-detects provider based on API key format and robustly extracts JSON insights.
 """
 
 import aiohttp
 import json
+import re
 
 
 def detect_provider(api_key: str) -> str:
@@ -29,6 +30,33 @@ def detect_provider(api_key: str) -> str:
     return 'openrouter'
 
 
+def extract_json_insights(text: str) -> dict:
+    """
+    Robustly extracts and parses a JSON object from text that may contain
+    markdown code blocks or conversational intro/outro text.
+    """
+    text = text.strip()
+    
+    # 1. Try matching ```json ... ``` or ``` ... ```
+    code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+    if code_block_match:
+        try:
+            return json.loads(code_block_match.group(1))
+        except json.JSONDecodeError:
+            pass
+            
+    # 2. Find first '{' and last '}'
+    bracket_match = re.search(r'(\{.*\})', text, re.DOTALL)
+    if bracket_match:
+        try:
+            return json.loads(bracket_match.group(1))
+        except json.JSONDecodeError:
+            pass
+            
+    # 3. Fallback to direct load
+    return json.loads(text)
+
+
 async def generate_ai_insights(api_key: str, competitor: str, topics: dict, sentiment: float, complaints: list) -> dict:
     """
     Generate AI-enhanced strategic insights using the provided API key.
@@ -38,7 +66,7 @@ async def generate_ai_insights(api_key: str, competitor: str, topics: dict, sent
         return None
     
     provider = detect_provider(api_key)
-    print(f"🤖 Using AI Provider: {provider.upper()}")
+    print(f"🤖 Requesting strategic insights from AI Provider: {provider.upper()}")
     
     # Create the prompt
     prompt = f"""You are a market intelligence expert. Analyze this competitor data and provide strategic insights.
@@ -49,18 +77,18 @@ TOP PAIN POINTS:
 {json.dumps(topics, indent=2)}
 
 SAMPLE COMPLAINTS:
-{chr(10).join([f"- {c[:150]}" for c in complaints[:10]])}
+{chr(10).join([f"- {c[:180]}" for c in complaints[:15]])}
 
 Provide a JSON response with exactly this structure:
 {{
-    "executive_summary": "2-3 sentence executive summary",
+    "executive_summary": "2-3 sentence executive summary of competitor weaknesses.",
     "top_opportunities": ["opportunity 1", "opportunity 2", "opportunity 3"],
-    "recommended_positioning": "How to position your product against this competitor",
+    "recommended_positioning": "Clear description of how to position your product against this competitor.",
     "quick_wins": ["quick win 1", "quick win 2"],
-    "risk_level": "LOW/MEDIUM/HIGH - how vulnerable is this competitor to disruption"
+    "risk_level": "LOW/MEDIUM/HIGH - competitor vulnerability to disruption."
 }}
 
-Return ONLY valid JSON, no markdown or extra text."""
+Return ONLY valid JSON. Do not include markdown formatting inside the JSON strings. Return nothing but the JSON object."""
 
     try:
         if provider == 'gemini':
@@ -76,13 +104,15 @@ Return ONLY valid JSON, no markdown or extra text."""
 
 async def call_gemini(api_key: str, prompt: str) -> dict:
     """Call Google Gemini API."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    # Standard stable Gemini 1.5 Flash endpoint (highly reliable and fast)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 1000
+            "temperature": 0.4,
+            "maxOutputTokens": 1000,
+            "responseMimeType": "application/json"
         }
     }
     
@@ -91,14 +121,20 @@ async def call_gemini(api_key: str, prompt: str) -> dict:
             if response.status == 200:
                 data = await response.json()
                 text = data['candidates'][0]['content']['parts'][0]['text']
-                # Clean and parse JSON
-                text = text.strip()
-                if text.startswith('```'):
-                    text = text.split('\n', 1)[1].rsplit('```', 1)[0]
-                return json.loads(text)
+                return extract_json_insights(text)
             else:
                 error = await response.text()
-                raise Exception(f"Gemini API error: {response.status} - {error[:200]}")
+                # Try fallback model if 1.5 flash fails/not found
+                print(f"⚠️ Gemini 1.5 Flash returned status {response.status}. Trying Gemini 2.0 Flash...")
+                fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                async with session.post(fallback_url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as fb_res:
+                    if fb_res.status == 200:
+                        fb_data = await fb_res.json()
+                        text = fb_data['candidates'][0]['content']['parts'][0]['text']
+                        return extract_json_insights(text)
+                    else:
+                        fb_error = await fb_res.text()
+                        raise Exception(f"Gemini API error: {fb_res.status} - {fb_error[:200]}")
 
 
 async def call_openai(api_key: str, prompt: str) -> dict:
@@ -113,8 +149,9 @@ async def call_openai(api_key: str, prompt: str) -> dict:
     payload = {
         "model": "gpt-4o-mini",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-        "max_tokens": 1000
+        "temperature": 0.4,
+        "max_tokens": 1000,
+        "response_format": {"type": "json_object"}
     }
     
     async with aiohttp.ClientSession() as session:
@@ -122,10 +159,7 @@ async def call_openai(api_key: str, prompt: str) -> dict:
             if response.status == 200:
                 data = await response.json()
                 text = data['choices'][0]['message']['content']
-                text = text.strip()
-                if text.startswith('```'):
-                    text = text.split('\n', 1)[1].rsplit('```', 1)[0]
-                return json.loads(text)
+                return extract_json_insights(text)
             else:
                 error = await response.text()
                 raise Exception(f"OpenAI API error: {response.status} - {error[:200]}")
@@ -141,10 +175,11 @@ async def call_openrouter(api_key: str, prompt: str) -> dict:
         "HTTP-Referer": "https://apify.com/churn-scout"
     }
     
+    # Use stable Llama 3 model which is cheap, fast, and highly capable
     payload = {
-        "model": "google/gemini-2.0-flash-exp:free",
+        "model": "meta-llama/llama-3-8b-instruct:free",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
+        "temperature": 0.4,
         "max_tokens": 1000
     }
     
@@ -153,10 +188,20 @@ async def call_openrouter(api_key: str, prompt: str) -> dict:
             if response.status == 200:
                 data = await response.json()
                 text = data['choices'][0]['message']['content']
-                text = text.strip()
-                if text.startswith('```'):
-                    text = text.split('\n', 1)[1].rsplit('```', 1)[0]
-                return json.loads(text)
+                return extract_json_insights(text)
             else:
                 error = await response.text()
+                # Try fallback models for OpenRouter free tier
+                fallback_models = [
+                    "google/gemini-2.0-flash-exp:free",
+                    "mistralai/mistral-7b-instruct:free"
+                ]
+                for model in fallback_models:
+                    print(f"⚠️ OpenRouter standard model failed. Trying fallback: {model}...")
+                    payload["model"] = model
+                    async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as fb_res:
+                        if fb_res.status == 200:
+                            fb_data = await fb_res.json()
+                            text = fb_data['choices'][0]['message']['content']
+                            return extract_json_insights(text)
                 raise Exception(f"OpenRouter API error: {response.status} - {error[:200]}")

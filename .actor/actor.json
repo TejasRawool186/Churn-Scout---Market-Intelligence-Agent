@@ -23,6 +23,9 @@
                             "topic",
                             "text",
                             "polarity",
+                            "source",
+                            "date",
+                            "engagement",
                             "url"
                         ]
                     },
@@ -39,6 +42,18 @@
                             },
                             "polarity": {
                                 "label": "Sentiment Score",
+                                "format": "number"
+                            },
+                            "source": {
+                                "label": "Source Platform",
+                                "format": "text"
+                            },
+                            "date": {
+                                "label": "Signal Date",
+                                "format": "text"
+                            },
+                            "engagement": {
+                                "label": "Engagement",
                                 "format": "number"
                             },
                             "url": {

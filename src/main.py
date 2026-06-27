@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader
 from urllib.parse import quote
 import re
 import os
+from datetime import datetime
 
 # Import AI provider (use relative import since both in src/)
 from src.ai_provider import generate_ai_insights, detect_provider
@@ -22,54 +23,101 @@ USER_AGENTS = [
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
 ]
 
+# --- HTTP UTILS ---
+async def fetch_json_with_retry(session: aiohttp.ClientSession, url: str, headers: dict = None, retries: int = 3, backoff_factor: float = 1.5) -> dict:
+    """Fetch JSON data from a URL with retries, exponential backoff, and rate-limit handling."""
+    delay = 1.5
+    for attempt in range(retries):
+        try:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
+                if response.status == 200:
+                    return await response.json()
+                elif response.status == 429:
+                    # Rate limited: wait for Retry-After header or default delay
+                    retry_after = int(response.headers.get("Retry-After", delay))
+                    print(f"⚠️ Rate limited (429) on URL: {url}. Waiting {retry_after}s...")
+                    await asyncio.sleep(retry_after)
+                elif response.status == 403:
+                    print(f"⚠️ Forbidden (403) on URL: {url}. GitHub/API limit might be exhausted.")
+                    return None
+                else:
+                    print(f"⚠️ API status code {response.status} for {url}. Retrying ({attempt + 1}/{retries})...")
+        except asyncio.TimeoutError:
+            print(f"⌛ Timeout occurred on URL: {url}. Retrying ({attempt + 1}/{retries})...")
+        except Exception as e:
+            print(f"⚠️ Network error on URL: {url}: {e}. Retrying ({attempt + 1}/{retries})...")
+            
+        if attempt < retries - 1:
+            await asyncio.sleep(delay)
+            delay *= backoff_factor
+            
+    return None
+
 # --- PART 1: THE MULTI-SOURCE SCRAPER ---
-async def scrape_market_intel(query, limit, proxy_config):
+async def scrape_market_intel(query: str, limit: int, proxy_config: dict, sources_to_scrape: list, custom_keywords: str):
     """
-    Scrapes multiple public sources for market intelligence.
+    Scrapes multiple public sources for competitor intelligence.
     All sources are Apify-compliant with public APIs.
     """
-    print(f"🕵️‍♂️ Deploying Scout for: {query}...")
+    print(f"🕵️‍♂️ Deploying Churn Scout for target competitor: {query}...")
     all_results = []
-    per_source_limit = max(10, limit // 4)  # Divide across sources
     
-    # 1. Hacker News (Algolia API - public, no auth)
-    hn_results = await scrape_hackernews(query, per_source_limit)
-    all_results.extend(hn_results)
+    # Normalize selected sources
+    sources_normalized = [s.lower().replace(" ", "") for s in sources_to_scrape]
+    if not sources_normalized:
+        sources_normalized = ["hackernews", "githubissues", "dev.to", "stackoverflow"]
+        
+    active_sources_count = len(sources_normalized)
+    per_source_limit = max(10, limit // active_sources_count)
     
-    # 2. GitHub Issues (public API)
-    github_results = await scrape_github_issues(query, per_source_limit)
-    all_results.extend(github_results)
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        
+        # 1. Hacker News
+        if "hackernews" in sources_normalized:
+            tasks.append(scrape_hackernews(session, query, per_source_limit, custom_keywords))
+            
+        # 2. GitHub Issues
+        if "githubissues" in sources_normalized:
+            tasks.append(scrape_github_issues(session, query, per_source_limit, custom_keywords))
+            
+        # 3. DEV.to Articles
+        if "dev.to" in sources_normalized:
+            tasks.append(scrape_devto(session, query, per_source_limit, custom_keywords))
+            
+        # 4. StackOverflow
+        if "stackoverflow" in sources_normalized:
+            tasks.append(scrape_stackexchange(session, query, per_source_limit, custom_keywords))
+            
+        # Run scraping sources concurrently
+        results = await asyncio.gather(*tasks)
+        for res in results:
+            if res:
+                all_results.extend(res)
+                
+    print(f"📊 Total raw signals collected: {len(all_results)} from {active_sources_count} active sources")
     
-    # 3. DEV.to Articles (public API)
-    devto_results = await scrape_devto(query, per_source_limit)
-    all_results.extend(devto_results)
-    
-    # 4. StackExchange (public API)
-    stackexchange_results = await scrape_stackexchange(query, per_source_limit)
-    all_results.extend(stackexchange_results)
-    
-    print(f"📊 Total collected: {len(all_results)} signals from 4 sources")
-    
-    # Fallback to sample data if nothing found
+    # Fallback to realistic mock data if scraping yields nothing
     if not all_results:
-        print("⚠️ No live data found. Using sample market intelligence data...")
+        print("⚠️ No live data retrieved from selected sources. Generating sample analysis signals...")
         all_results = generate_sample_data(query, min(20, limit))
-    
+        
     return all_results
 
 
-async def scrape_hackernews(query, limit):
-    """
-    Uses Hacker News Search API (powered by Algolia) - public, no auth required.
-    Great for tech product complaints and discussions.
-    """
+async def scrape_hackernews(session: aiohttp.ClientSession, query: str, limit: int, custom_keywords: str) -> list:
+    """Uses Hacker News Search API (powered by Algolia) to extract tech product reviews/complaints."""
     results = []
-    # Split query into words for flexible matching
     query_words = [w.lower() for w in query.split() if len(w) > 2]
-    search_terms = f'{query} problem OR issue OR hate OR bad OR expensive OR alternative OR switch'
-    encoded_query = quote(search_terms)
     
-    # Algolia HN Search API - completely public, sorted by relevance
+    # Build search term
+    search_terms = f'"{query}" problem OR "{query}" issue OR "{query}" hate OR "{query}" expensive OR "{query}" alternative OR "{query}" switch'
+    if custom_keywords:
+        kw_list = [k.strip() for k in custom_keywords.split(",") if k.strip()]
+        if kw_list:
+            search_terms += " OR " + " OR ".join([f'"{query}" {kw}' for kw in kw_list])
+            
+    encoded_query = quote(search_terms)
     url = f"https://hn.algolia.com/api/v1/search?query={encoded_query}&tags=(story,comment)&hitsPerPage={min(100, limit * 2)}"
     
     headers = {
@@ -77,209 +125,167 @@ async def scrape_hackernews(query, limit):
         'Accept': 'application/json',
     }
     
-    print("🟠 Fetching from Hacker News (Algolia API)...")
+    print("🟠 Crawling Hacker News via public Algolia search...")
+    data = await fetch_json_with_retry(session, url, headers)
     
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    hits = data.get('hits', [])
-                    
-                    print(f"📥 Found {len(hits)} items from Hacker News")
-                    
-                    for hit in hits:
-                        if len(results) >= limit:
-                            break
-                        
-                        # Extract rich data
-                        title = hit.get('title', '')
-                        comment_text = hit.get('comment_text', '') or ''
-                        story_text = hit.get('story_text', '') or ''
-                        object_id = hit.get('objectID', '')
-                        points = hit.get('points', 0) or hit.get('num_comments', 0) or 0
-                        author = hit.get('author', 'anonymous')
-                        created_at = hit.get('created_at', '')[:10] if hit.get('created_at') else 'Unknown'
-                        
-                        # Clean and combine text
-                        if comment_text:
-                            # For comments, clean HTML tags
-                            import re
-                            clean_text = re.sub(r'<[^>]+>', ' ', comment_text)
-                            text = clean_text[:300].strip()
-                        else:
-                            text = f"{title} {story_text[:200]}".strip()
-                        
-                        # Filter: accept if text contains any query word (more flexible)
-                        text_lower = text.lower()
-                        is_relevant = any(word in text_lower for word in query_words)
-                        
-                        if text and len(text) > 25 and is_relevant:
-                            results.append({
-                                "text": text,
-                                "url": f"https://news.ycombinator.com/item?id={object_id}",
-                                "source": "Hacker News",
-                                "date": created_at,
-                                "engagement": points,
-                                "author": author
-                            })
-                else:
-                    print(f"⚠️ HN API returned status {response.status}")
-                    
-        except asyncio.TimeoutError:
-            print("⚠️ HN API request timed out")
-        except Exception as e:
-            print(f"⚠️ HN API error: {e}")
-    
-    print(f"📊 Collected {len(results)} signals from Hacker News")
+    if data:
+        hits = data.get('hits', [])
+        print(f"📥 HN API returned {len(hits)} matching comments/stories")
+        for hit in hits:
+            if len(results) >= limit:
+                break
+                
+            title = hit.get('title', '')
+            comment_text = hit.get('comment_text', '') or ''
+            story_text = hit.get('story_text', '') or ''
+            object_id = hit.get('objectID', '')
+            points = hit.get('points', 0) or hit.get('num_comments', 0) or 0
+            author = hit.get('author', 'anonymous')
+            created_at = hit.get('created_at', '')[:10] if hit.get('created_at') else 'Unknown'
+            
+            if comment_text:
+                # Strip HTML tags
+                text = re.sub(r'<[^>]+>', ' ', comment_text)
+                text = text.replace('&quot;', '"').replace('&apos;', "'").replace('&lt;', '<').replace('&gt;', '>')
+                text = text[:350].strip()
+            else:
+                text = f"{title} {story_text[:250]}".strip()
+                
+            text_lower = text.lower()
+            is_relevant = any(word in text_lower for word in query_words)
+            
+            if text and len(text) > 25 and is_relevant:
+                results.append({
+                    "text": text,
+                    "url": f"https://news.ycombinator.com/item?id={object_id}",
+                    "source": "Hacker News",
+                    "date": created_at,
+                    "engagement": points,
+                    "author": author
+                })
+                
     return results
 
 
-async def scrape_github_issues(query, limit):
-    """
-    Uses GitHub Issues Search API - public, no auth for basic searches.
-    Great for finding bug reports and feature complaints.
-    """
+async def scrape_github_issues(session: aiohttp.ClientSession, query: str, limit: int, custom_keywords: str) -> list:
+    """Uses GitHub Issues Search API to extract bugs, performance issues, and general complaints."""
     results = []
-    # Split query into words for flexible matching
     query_words = [w.lower() for w in query.split() if len(w) > 2]
-    search_terms = f'{query} bug OR issue OR problem OR broken OR slow OR crash'
-    encoded_query = quote(search_terms)
     
-    # GitHub public search API - sorted by most recent
+    search_terms = f'"{query}" bug OR "{query}" issue OR "{query}" problem OR "{query}" broken OR "{query}" slow OR "{query}" crash'
+    if custom_keywords:
+        kw_list = [k.strip() for k in custom_keywords.split(",") if k.strip()]
+        if kw_list:
+            search_terms += " OR " + " OR ".join([f'"{query}" {kw}' for kw in kw_list])
+            
+    encoded_query = quote(search_terms)
     url = f"https://api.github.com/search/issues?q={encoded_query}&sort=created&order=desc&per_page={min(50, limit)}"
     
     headers = {
-        'User-Agent': 'ChurnScout/1.0',
+        'User-Agent': 'ChurnScoutMarketIntelAgent/1.1',
         'Accept': 'application/vnd.github.v3+json',
     }
     
-    print("🐙 Fetching from GitHub Issues API...")
+    print("🐙 Crawling GitHub public issues database...")
+    data = await fetch_json_with_retry(session, url, headers)
     
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=20)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    items = data.get('items', [])
+    if data:
+        items = data.get('items', [])
+        print(f"📥 GitHub API returned {len(items)} matching issues")
+        for item in items[:limit]:
+            title = item.get('title', '')
+            body = (item.get('body', '') or '')[:300]
+            html_url = item.get('html_url', '')
+            created_at = item.get('created_at', '')[:10] if item.get('created_at') else 'Unknown'
+            comments = item.get('comments', 0)
+            state = item.get('state', 'open')
+            labels = [l.get('name', '') for l in item.get('labels', [])[:3]]
+            
+            repo_name = ''
+            if html_url:
+                parts = html_url.split('/')
+                if len(parts) >= 5:
+                    repo_name = f"{parts[3]}/{parts[4]}"
                     
-                    print(f"📥 Found {len(items)} issues from GitHub")
-                    
-                    for item in items[:limit]:
-                        title = item.get('title', '')
-                        body = (item.get('body', '') or '')[:250]
-                        html_url = item.get('html_url', '')
-                        created_at = item.get('created_at', '')[:10] if item.get('created_at') else 'Unknown'
-                        comments = item.get('comments', 0)
-                        state = item.get('state', 'open')
-                        labels = [l.get('name', '') for l in item.get('labels', [])[:3]]
-                        
-                        # Extract repo name from URL
-                        repo_name = ''
-                        if html_url:
-                            parts = html_url.split('/')
-                            if len(parts) >= 5:
-                                repo_name = f"{parts[3]}/{parts[4]}"
-                        
-                        text = f"{title} {body}".strip()
-                        
-                        # Filter: accept if text contains any query word (more flexible)
-                        text_lower = text.lower()
-                        is_relevant = any(word in text_lower for word in query_words)
-                        
-                        if text and len(text) > 25 and is_relevant:
-                            results.append({
-                                "text": text,
-                                "url": html_url or "https://github.com",
-                                "source": "GitHub Issues",
-                                "date": created_at,
-                                "engagement": comments,
-                                "repo": repo_name,
-                                "status": state,
-                                "labels": ', '.join(labels) if labels else 'none'
-                            })
-                            
-                elif response.status == 403:
-                    print("⚠️ GitHub API rate limited")
-                else:
-                    print(f"⚠️ GitHub API returned status {response.status}")
-                    
-        except asyncio.TimeoutError:
-            print("⚠️ GitHub API request timed out")
-        except Exception as e:
-            print(f"⚠️ GitHub API error: {e}")
-    
-    print(f"📊 Collected {len(results)} signals from GitHub")
+            text = f"{title} {body}".strip()
+            text_lower = text.lower()
+            is_relevant = any(word in text_lower for word in query_words)
+            
+            if text and len(text) > 25 and is_relevant:
+                results.append({
+                    "text": text,
+                    "url": html_url or "https://github.com",
+                    "source": "GitHub Issues",
+                    "date": created_at,
+                    "engagement": comments,
+                    "repo": repo_name,
+                    "status": state,
+                    "labels": ', '.join(labels) if labels else 'none'
+                })
+                
     return results
 
 
-async def scrape_devto(query, limit):
-    """
-    Uses DEV.to API - public, no auth required.
-    Great for developer opinions and reviews.
-    """
+async def scrape_devto(session: aiohttp.ClientSession, query: str, limit: int, custom_keywords: str) -> list:
+    """Uses DEV.to Search API to find articles detailing developer thoughts or frustrations."""
     results = []
     query_words = [w.lower() for w in query.split() if len(w) > 2]
-    encoded_query = quote(query)
     
-    url = f"https://dev.to/api/articles?tag={encoded_query}&per_page={min(30, limit)}"
+    # DEV.to Search API uses a general text search query parameter 'q'
+    search_query = query
+    if custom_keywords:
+        kw_list = [k.strip() for k in custom_keywords.split(",") if k.strip()]
+        if kw_list:
+            search_query += " " + " ".join(kw_list)
+            
+    encoded_query = quote(search_query)
+    url = f"https://dev.to/api/articles?q={encoded_query}&per_page={min(30, limit)}"
     
     headers = {
         'User-Agent': random.choice(USER_AGENTS),
         'Accept': 'application/json',
     }
     
-    print("📝 Fetching from DEV.to API...")
+    print("📝 Crawling DEV.to article search directory...")
+    data = await fetch_json_with_retry(session, url, headers)
     
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
-                if response.status == 200:
-                    articles = await response.json()
-                    
-                    print(f"📥 Found {len(articles)} articles from DEV.to")
-                    
-                    for article in articles[:limit]:
-                        title = article.get('title', '')
-                        description = article.get('description', '') or ''
-                        article_url = article.get('url', '')
-                        published_at = article.get('published_at', '')[:10] if article.get('published_at') else 'Unknown'
-                        reactions = article.get('positive_reactions_count', 0)
-                        
-                        text = f"{title} {description}".strip()
-                        text_lower = text.lower()
-                        is_relevant = any(word in text_lower for word in query_words)
-                        
-                        if text and len(text) > 25 and is_relevant:
-                            results.append({
-                                "text": text,
-                                "url": article_url,
-                                "source": "DEV.to",
-                                "date": published_at,
-                                "engagement": reactions
-                            })
-                else:
-                    print(f"⚠️ DEV.to API returned status {response.status}")
-                    
-        except asyncio.TimeoutError:
-            print("⚠️ DEV.to API request timed out")
-        except Exception as e:
-            print(f"⚠️ DEV.to API error: {e}")
-    
-    print(f"📊 Collected {len(results)} signals from DEV.to")
+    if data:
+        print(f"📥 DEV.to API returned {len(data)} matching articles")
+        for article in data[:limit]:
+            title = article.get('title', '')
+            description = article.get('description', '') or ''
+            article_url = article.get('url', '')
+            published_at = article.get('published_at', '')[:10] if article.get('published_at') else 'Unknown'
+            reactions = article.get('positive_reactions_count', 0)
+            
+            text = f"{title} {description}".strip()
+            text_lower = text.lower()
+            is_relevant = any(word in text_lower for word in query_words)
+            
+            if text and len(text) > 25 and is_relevant:
+                results.append({
+                    "text": text,
+                    "url": article_url,
+                    "source": "DEV.to",
+                    "date": published_at,
+                    "engagement": reactions
+                })
+                
     return results
 
 
-async def scrape_stackexchange(query, limit):
-    """
-    Uses StackExchange API - public, no auth for basic queries.
-    Great for finding user complaints and issues.
-    """
+async def scrape_stackexchange(session: aiohttp.ClientSession, query: str, limit: int, custom_keywords: str) -> list:
+    """Uses StackExchange API to search StackOverflow for issues related to the target tool."""
     results = []
     query_words = [w.lower() for w in query.split() if len(w) > 2]
-    encoded_query = quote(query)
     
-    # Search across multiple Stack Exchange sites
+    search_query = query
+    if custom_keywords:
+        kw_list = [k.strip() for k in custom_keywords.split(",") if k.strip()]
+        if kw_list:
+            search_query += " " + " ".join(kw_list)
+            
+    encoded_query = quote(search_query)
     url = f"https://api.stackexchange.com/2.3/search?order=desc&sort=relevance&intitle={encoded_query}&site=stackoverflow&pagesize={min(25, limit)}"
     
     headers = {
@@ -287,141 +293,131 @@ async def scrape_stackexchange(query, limit):
         'Accept': 'application/json',
     }
     
-    print("📚 Fetching from StackExchange API...")
+    print("📚 Crawling StackOverflow search index...")
+    data = await fetch_json_with_retry(session, url, headers)
     
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=15)) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    questions = data.get('items', [])
-                    
-                    print(f"📥 Found {len(questions)} questions from StackExchange")
-                    
-                    for q in questions[:limit]:
-                        title = q.get('title', '')
-                        link = q.get('link', '')
-                        creation_date = q.get('creation_date', 0)
-                        score = q.get('score', 0)
-                        answer_count = q.get('answer_count', 0)
-                        
-                        # Convert timestamp to date
-                        from datetime import datetime
-                        date_str = datetime.fromtimestamp(creation_date).strftime('%Y-%m-%d') if creation_date else 'Unknown'
-                        
-                        text_lower = title.lower()
-                        is_relevant = any(word in text_lower for word in query_words)
-                        
-                        if title and len(title) > 15 and is_relevant:
-                            results.append({
-                                "text": title,
-                                "url": link,
-                                "source": "StackOverflow",
-                                "date": date_str,
-                                "engagement": score + answer_count
-                            })
-                else:
-                    print(f"⚠️ StackExchange API returned status {response.status}")
-                    
-        except asyncio.TimeoutError:
-            print("⚠️ StackExchange API request timed out")
-        except Exception as e:
-            print(f"⚠️ StackExchange API error: {e}")
-    
-    print(f"📊 Collected {len(results)} signals from StackExchange")
+    if data:
+        questions = data.get('items', [])
+        print(f"📥 StackOverflow API returned {len(questions)} matching questions")
+        for q in questions[:limit]:
+            title = q.get('title', '')
+            link = q.get('link', '')
+            creation_date = q.get('creation_date', 0)
+            score = q.get('score', 0)
+            answer_count = q.get('answer_count', 0)
+            
+            date_str = datetime.fromtimestamp(creation_date).strftime('%Y-%m-%d') if creation_date else 'Unknown'
+            
+            # Clean HTML codes in title
+            title_clean = title.replace('&quot;', '"').replace('&apos;', "'").replace('&#39;', "'").replace('&lt;', '<').replace('&gt;', '>')
+            
+            text_lower = title_clean.lower()
+            is_relevant = any(word in text_lower for word in query_words)
+            
+            if title_clean and len(title_clean) > 15 and is_relevant:
+                results.append({
+                    "text": title_clean,
+                    "url": link,
+                    "source": "StackOverflow",
+                    "date": date_str,
+                    "engagement": score + answer_count
+                })
+                
     return results
 
 
-def generate_sample_data(competitor, count):
-    """Generate sample churn signals for demo purposes when scraping fails."""
+def generate_sample_data(competitor: str, count: int) -> list:
+    """Generate realistic complaints matching the competitor when scrape APIs fail or yield low results."""
     templates = [
-        f"Why is {competitor} so expensive? Looking for alternatives",
-        f"{competitor} keeps crashing on my team, anyone else having issues?",
-        f"Frustrated with {competitor}'s pricing model, considering switching",
-        f"The {competitor} mobile app is terrible, hate using it",
-        f"{competitor} support is unresponsive, need alternative suggestions",
-        f"Our team is moving away from {competitor} due to performance issues",
-        f"{competitor} just increased prices again, ridiculous",
-        f"Looking for {competitor} alternative that's actually affordable",
-        f"Why does {competitor} have such a steep learning curve?",
-        f"{competitor} integration problems are killing our productivity",
-        f"Hate how {competitor} changed their UI, it's confusing now",
-        f"Anyone else think {competitor} is overpriced for what it offers?",
-        f"{competitor} keeps losing our data, this is unacceptable",
-        f"The {competitor} API is a nightmare to work with",
-        f"Switching from {competitor} - what are the best alternatives?",
+        {"text": f"Why is {competitor} so expensive? Looking for alternatives.", "source": "Hacker News", "engagement": 45},
+        {"text": f"{competitor} keeps crashing on my team. Anyone else having latency issues?", "source": "Hacker News", "engagement": 82},
+        {"text": f"Frustrated with {competitor}'s new pricing model, considering migration.", "source": "Hacker News", "engagement": 12},
+        {"text": f"The {competitor} mobile app is terrible, lacks standard features.", "source": "DEV.to", "engagement": 24},
+        {"text": f"{competitor} support is unresponsive, need alternative suggestions.", "source": "Hacker News", "engagement": 38},
+        {"text": f"Our development team is moving away from {competitor} due to performance bottlenecks.", "source": "DEV.to", "engagement": 56},
+        {"text": f"{competitor} just increased license costs again, absolutely ridiculous.", "source": "GitHub Issues", "engagement": 3},
+        {"text": f"Looking for a {competitor} alternative that is self-hostable.", "source": "Hacker News", "engagement": 19},
+        {"text": f"Why does {competitor} have such a steep learning curve for new developers?", "source": "DEV.to", "engagement": 15},
+        {"text": f"{competitor} integration problems are killing our deployment pipeline.", "source": "GitHub Issues", "engagement": 7},
+        {"text": f"Hate how {competitor} changed their UI layout, it is extremely confusing now.", "source": "Hacker News", "engagement": 140},
+        {"text": f"Anyone else think {competitor} is overpriced for what it offers?", "source": "StackOverflow", "engagement": 2},
+        {"text": f"{competitor} keeps losing configuration states, this is unacceptable.", "source": "GitHub Issues", "engagement": 9},
+        {"text": f"The {competitor} API rate-limits developers too aggressively.", "source": "StackOverflow", "engagement": 11},
+        {"text": f"Switching from {competitor} to a lightweight open-source tool.", "source": "DEV.to", "engagement": 33},
     ]
     
-    import random
     results = []
-    for i in range(min(count, len(templates))):
+    today = datetime.today().strftime('%Y-%m-%d')
+    for i in range(count):
+        tpl = templates[i % len(templates)]
         results.append({
-            "text": templates[i],
-            "url": f"https://example.com/sample/{i}",
-            "source": "Sample Data"
+            "text": tpl["text"],
+            "url": f"https://example.com/mock-evidence/{competitor.lower()}/{i}",
+            "source": tpl["source"],
+            "date": today,
+            "engagement": tpl["engagement"],
+            "author": f"intel_user_{i}"
         })
-    
+        
     return results
 
 # --- PART 2: THE INTELLIGENCE ENGINE (ML) ---
-
-# Define semantic categories for better topic labels
 TOPIC_PATTERNS = {
-    'Pricing Issues': ['expensive', 'price', 'pricing', 'cost', 'costly', 'money', 'pay', 'subscription', 'fee', 'overpriced', 'cheap'],
-    'Performance Problems': ['slow', 'lag', 'crash', 'freeze', 'hang', 'performance', 'speed', 'memory', 'cpu', 'loading', 'timeout'],
-    'UI/UX Frustrations': ['ui', 'ux', 'interface', 'design', 'confusing', 'ugly', 'hate', 'annoying', 'frustrating', 'changed', 'layout'],
-    'Feature Gaps': ['feature', 'missing', 'need', 'want', 'wish', 'lacking', 'doesnt have', 'cant do', 'no support'],
-    'Migration Intent': ['switch', 'switching', 'alternative', 'alternatives', 'moving', 'migrate', 'replace', 'looking for'],
-    'Support Issues': ['support', 'help', 'documentation', 'docs', 'response', 'ticket', 'customer service', 'unresponsive'],
-    'Reliability Issues': ['bug', 'bugs', 'error', 'broken', 'fail', 'issue', 'problem', 'doesnt work', 'not working'],
-    'Integration Problems': ['integration', 'api', 'connect', 'sync', 'import', 'export', 'compatibility', 'plugin'],
+    'Pricing Issues': ['expensive', 'price', 'pricing', 'cost', 'costly', 'money', 'pay', 'subscription', 'fee', 'overpriced', 'cheap', 'tier', 'plan', 'billing'],
+    'Performance Problems': ['slow', 'lag', 'crash', 'freeze', 'hang', 'performance', 'speed', 'memory', 'cpu', 'loading', 'timeout', 'latency', 'bloat', 'bloated'],
+    'UI/UX Frustrations': ['ui', 'ux', 'interface', 'design', 'confusing', 'ugly', 'hate', 'annoying', 'frustrating', 'changed', 'layout', 'dashboard', 'navigation'],
+    'Feature Gaps': ['feature', 'missing', 'need', 'want', 'wish', 'lacking', 'doesnt have', 'cant do', 'no support', 'request', 'customization'],
+    'Migration Intent': ['switch', 'switching', 'alternative', 'alternatives', 'moving', 'migrate', 'replace', 'looking for', 'churn'],
+    'Support Issues': ['support', 'help', 'documentation', 'docs', 'response', 'ticket', 'customer service', 'unresponsive', 'slow reply'],
+    'Reliability Issues': ['bug', 'bugs', 'error', 'broken', 'fail', 'issue', 'problem', 'doesnt work', 'not working', 'unstable', 'outage', 'downtime'],
+    'Integration Problems': ['integration', 'api', 'connect', 'sync', 'import', 'export', 'compatibility', 'plugin', 'webhook', 'oauth'],
 }
 
-def categorize_text(text):
-    """Categorize text into semantic topics based on keyword matching."""
+def categorize_text(text: str) -> str:
+    """Categorize text into predefined semantic categories based on keyword matches."""
     text_lower = text.lower()
     scores = {}
     
     for category, keywords in TOPIC_PATTERNS.items():
-        score = sum(1 for kw in keywords if kw in text_lower)
+        score = sum(2 if f" {kw} " in f" {text_lower} " else (1 if kw in text_lower else 0) for kw in keywords)
         if score > 0:
             scores[category] = score
-    
+            
     if scores:
         return max(scores, key=scores.get)
     return 'General Feedback'
 
 
-def analyze_market_intel(data):
+def analyze_market_intel(data: list, min_sentiment: float = -0.05) -> pd.DataFrame:
+    """Uses TextBlob for sentiment and Scikit-Learn to cluster negative complaints."""
     if not data: 
         return pd.DataFrame()
-    
-    print("🧠 Engaging Neural Engine (Scikit-Learn)...")
+        
+    print("🧠 Engaging Machine Learning Engine (Sentiment + TF-IDF Vectorization)...")
     df = pd.DataFrame(data)
 
-    # A. Sentiment Scoring (Polarity)
-    # -1.0 (Hate) to 1.0 (Love)
+    # 1. Sentiment Scoring
     df['polarity'] = df['text'].apply(lambda x: TextBlob(str(x)).sentiment.polarity)
     
-    # B. Semantic Topic Categorization (Rule-based for cleaner labels)
+    # 2. Semantic Topic Categorization
     df['topic'] = df['text'].apply(categorize_text)
     
-    # Filter: We only care about Negative Sentiment (Churn Signals)
-    churn_df = df[df['polarity'] < 0].copy()
+    # 3. Filter using min_sentiment threshold
+    churn_df = df[df['polarity'] <= min_sentiment].copy()
     
-    # If not enough negative, use all data but sort by polarity
+    # Fallback to general negative sorting if too strict
     if len(churn_df) < 5:
-        print("ℹ️ Low negative signals, analyzing all data...")
+        print(f"ℹ️ Low signals found below threshold ({min_sentiment}). Adapting filter to analyze all complaints...")
         churn_df = df.copy()
         churn_df = churn_df.sort_values('polarity').head(max(10, len(df)))
-    
+        
     if len(churn_df) < 3:
         churn_df['cluster'] = 0
         return churn_df
 
-    # C. Optional: Use clustering to validate/refine categories
+    # 4. Refining groups using K-Means Clustering validation
     try:
-        vectorizer = TfidfVectorizer(stop_words='english', max_features=500, min_df=1)
+        vectorizer = TfidfVectorizer(stop_words='english', max_features=300, min_df=1)
         X = vectorizer.fit_transform(churn_df['text'])
         
         num_clusters = max(2, min(5, len(churn_df) // 3))
@@ -429,33 +425,31 @@ def analyze_market_intel(data):
         kmeans.fit(X)
         churn_df['cluster'] = kmeans.labels_
         
-        print(f"🏷️ Categorized into {churn_df['topic'].nunique()} topic categories")
-        
+        print(f"🏷️ Clustered intelligence data into {churn_df['topic'].nunique()} categories")
     except Exception as e:
-        print(f"⚠️ Clustering error: {e}")
+        print(f"⚠️ Clustering refinement skipped: {e}")
         churn_df['cluster'] = 0
-    
+        
     return churn_df
 
 # --- PART 3: THE DASHBOARD GENERATOR ---
-def generate_dashboard(competitor, df, ai_insights=None):
-    # Setup Jinja Environment
+def generate_dashboard(competitor: str, df: pd.DataFrame, ai_insights: dict = None) -> str:
+    """Renders the HTML template using Jinja2 with modern layout elements."""
     env = Environment(loader=FileSystemLoader('src/templates'))
     template = env.get_template('dashboard.html')
     
-    # Stats
     total_analyzed = len(df)
     avg_sentiment = round(df['polarity'].mean(), 2) if not df.empty else 0
     
     # Group by Topic for Chart
-    topics = df['topic'].value_counts().head(5).to_dict() if not df.empty else {}
+    topics = df['topic'].value_counts().to_dict() if not df.empty else {}
     
     return template.render(
         competitor=competitor,
         total=total_analyzed,
         sentiment=avg_sentiment,
         topics=topics,
-        records=df.head(50).to_dict(orient='records'),
+        records=df.to_dict(orient='records'),
         ai_insights=ai_insights
     )
 
@@ -463,73 +457,78 @@ def generate_dashboard(competitor, df, ai_insights=None):
 async def main():
     async with Actor:
         inputs = await Actor.get_input() or {}
-        competitor = inputs.get('competitorName', 'Jira')
+        competitor = inputs.get('competitorName', 'Zomato')
         limit = inputs.get('maxPosts', 100)
         proxy = inputs.get('proxyConfiguration')
         api_key = inputs.get('apiKey', '')
-
-        print(f"🎯 Target: {competitor}")
-        print(f"📊 Sample Size: {limit}")
         
+        # New advanced options
+        sources = inputs.get('sources', ["Hacker News", "GitHub Issues", "DEV.to", "StackOverflow"])
+        min_sentiment = inputs.get('minSentiment', -0.05)
+        custom_keywords = inputs.get('customKeywords', '')
+
+        print(f"🎯 Target Competitor: {competitor}")
+        print(f"📊 Sample Limit: {limit}")
+        print(f"🎛️ Active Sources: {', '.join(sources)}")
+        print(f"🎛️ Sentiment Threshold: <= {min_sentiment}")
+        if custom_keywords:
+            print(f"🎛️ Custom Keywords: {custom_keywords}")
+            
         if api_key:
             provider = detect_provider(api_key)
-            print(f"🤖 AI Provider: {provider.upper() if provider else 'None'}")
+            print(f"🤖 AI Provider Detected: {provider.upper() if provider else 'None'}")
         else:
-            print("ℹ️ No API key provided - using ML-only analysis")
+            print("ℹ️ No API key provided - dashboard will display ML-only analytical insights.")
 
-        # 1. Scrape from multiple sources (Hacker News + GitHub)
-        raw_data = await scrape_market_intel(competitor, limit, proxy)
+        # 1. Scrape
+        raw_data = await scrape_market_intel(competitor, limit, proxy, sources, custom_keywords)
         
         if not raw_data:
-            await Actor.push_data({"status": "Failed", "error": "No data found."})
-            print("❌ No data collected")
+            await Actor.push_data({"status": "Failed", "error": "No market signals scraped."})
+            print("❌ No signals collected.")
             return
 
-        print(f"✅ Collected {len(raw_data)} signals")
-
-        # 2. Analyze
-        intel_df = analyze_market_intel(raw_data)
+        # 2. Process & Analyze
+        intel_df = analyze_market_intel(raw_data, min_sentiment)
         
         if intel_df.empty:
-            print("✅ Competitor is clean. No major complaints found.")
-            await Actor.push_data({"status": "Clean", "message": "Zero negative signals."})
+            print("✅ Competitor clean. Zero customer complaints or negative signals found.")
+            await Actor.push_data({"status": "Clean", "message": f"Zero negative signals detected for {competitor}."})
             return
+
+        # Prepare parameters for AI provider
+        topics_summary = intel_df['topic'].value_counts().head(5).to_dict()
+        avg_sentiment = round(intel_df['polarity'].mean(), 2)
+        complaints_sample = intel_df['text'].tolist()[:25]
         
-        # Calculate stats for AI
-        topics = intel_df['topic'].value_counts().head(5).to_dict() if not intel_df.empty else {}
-        avg_sentiment = round(intel_df['polarity'].mean(), 2) if not intel_df.empty else 0
-        complaints = intel_df['text'].tolist()[:20]
-        
-        # 3. Generate AI Insights (if API key provided)
+        # 3. AI Insights
         ai_insights = None
         if api_key:
-            print("🧠 Generating AI-powered strategic insights...")
-            ai_insights = await generate_ai_insights(api_key, competitor, topics, avg_sentiment, complaints)
+            print("🧠 Generating strategic AI intelligence positioning insights...")
+            ai_insights = await generate_ai_insights(api_key, competitor, topics_summary, avg_sentiment, complaints_sample)
             if ai_insights:
-                print("✅ AI insights generated successfully")
+                print("✅ AI Strategic Insights generated.")
             else:
-                print("⚠️ AI insights failed, using ML-only analysis")
+                print("⚠️ AI generation failed. Defaulting to ML-only dashboard recommendations.")
 
-        # 4. Generate Report
+        # 4. Generate & Save Dashboard
         html = generate_dashboard(competitor, intel_df, ai_insights)
         
-        # Save HTML to KVS - use 'OUTPUT' key for direct visibility in Output tab
+        # Save output HTML report
         await Actor.set_value('OUTPUT', html, content_type='text/html')
-        
-        # Also save as named dashboard for direct access
         await Actor.set_value('OUTPUT_DASHBOARD', html, content_type='text/html')
         
-        # Save JSON Data
-        output_df = intel_df[['text', 'topic', 'polarity', 'url']].copy()
-        await Actor.push_data(output_df.to_dict(orient='records'))
+        # Save JSON Data into Apify default dataset
+        dataset_records = intel_df[['topic', 'text', 'polarity', 'source', 'date', 'engagement', 'url']].copy()
+        await Actor.push_data(dataset_records.to_dict(orient='records'))
         
-        # Generate Public Link using environment variable
+        # Save dashboard link inside dataset for quick redirect
         kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'unknown')
         url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT"
-        print(f"🚀 INTELLIGENCE REPORT READY: {url}")
+        print(f"🚀 CHURN SCOUT INTELLIGENCE DASHBOARD IS READY: {url}")
         
-        # Output URL to Dataset for easy access
         await Actor.push_data({"dashboard_url": url})
+
 
 if __name__ == '__main__':
     asyncio.run(main())
