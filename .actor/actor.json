@@ -1,69 +1,25 @@
 {
     "actorSpecification": 1,
     "name": "churn-scout",
-    "title": "Churn Scout - Market Intelligence Agent",
-    "description": "Autonomous market intelligence agent that identifies why customers are leaving a competitor by analyzing public sentiment signals. Uses ML to cluster complaints into actionable Pain Points.",
-    "version": "1.0.0",
+    "title": "Churn Scout - AI Competitor Churn & Market Intelligence Scraper",
+    "description": "Automated market intelligence agent that detects why customers abandon your competitors. Scrapes sentiment & complaints from Reddit, Hacker News, GitHub, DEV.to, and StackOverflow into an interactive AI executive dashboard.",
+    "version": "1.1.0",
     "buildTag": "latest",
     "meta": {
-        "templateId": "python-playwright"
+        "templateId": "python-empty",
+        "generatedBy": "Antigravity with Gemini 3.8 Flash"
     },
-    "input": "./input_schema.json",
-    "output": "./output_schema.json",
-    "dockerfile": "../Dockerfile",
+    "inputSchema": "./input_schema.json",
+    "outputSchema": "./output_schema.json",
     "storages": {
-        "dataset": {
-            "actorSpecification": 1,
-            "title": "Churn Intelligence Data",
-            "views": {
-                "overview": {
-                    "title": "Churn Signals Overview",
-                    "transformation": {
-                        "fields": [
-                            "topic",
-                            "text",
-                            "polarity",
-                            "source",
-                            "date",
-                            "engagement",
-                            "url"
-                        ]
-                    },
-                    "display": {
-                        "component": "table",
-                        "properties": {
-                            "topic": {
-                                "label": "Pain Point Topic",
-                                "format": "text"
-                            },
-                            "text": {
-                                "label": "Complaint Snippet",
-                                "format": "text"
-                            },
-                            "polarity": {
-                                "label": "Sentiment Score",
-                                "format": "number"
-                            },
-                            "source": {
-                                "label": "Source Platform",
-                                "format": "text"
-                            },
-                            "date": {
-                                "label": "Signal Date",
-                                "format": "text"
-                            },
-                            "engagement": {
-                                "label": "Engagement",
-                                "format": "number"
-                            },
-                            "url": {
-                                "label": "Source URL",
-                                "format": "link"
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+        "dataset": "./dataset_schema.json",
+        "keyValueStore": "./key_value_store_schema.json"
+    },
+    "dockerfile": "../Dockerfile",
+    "categories": [
+        "AI",
+        "MARKETING",
+        "BUSINESS",
+        "DEVELOPER_TOOLS"
+    ]
 }
