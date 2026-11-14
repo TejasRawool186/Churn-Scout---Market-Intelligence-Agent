@@ -1,11 +1,14 @@
 """
-AI Provider Module - Supports Gemini, OpenAI, and OpenRouter
-Auto-detects provider based on API key format and robustly extracts JSON insights.
+AI Strategic Copilot Module - Supports Gemini, OpenAI, Anthropic Claude, and OpenRouter.
+Auto-detects AI provider based on API key prefix and robustly extracts JSON insights.
 """
 
 import aiohttp
 import json
 import re
+import logging
+
+logger = logging.getLogger("churn-scout-ai")
 
 
 def detect_provider(api_key: str) -> str:
@@ -15,18 +18,23 @@ def detect_provider(api_key: str) -> str:
     
     api_key = api_key.strip()
     
+    # Anthropic keys start with 'sk-ant-'
+    if api_key.startswith('sk-ant-'):
+        return 'anthropic'
+        
     # Gemini keys start with 'AIza'
     if api_key.startswith('AIza'):
         return 'gemini'
     
-    # OpenAI keys start with 'sk-'
+    # OpenRouter keys start with 'sk-or-'
+    if api_key.startswith('sk-or-'):
+        return 'openrouter'
+    
+    # OpenAI standard keys start with 'sk-'
     if api_key.startswith('sk-'):
-        # OpenRouter also uses sk- but usually sk-or-
-        if api_key.startswith('sk-or-'):
-            return 'openrouter'
         return 'openai'
     
-    # Default to OpenRouter for other formats
+    # Default to OpenRouter for general keys
     return 'openrouter'
 
 
@@ -59,59 +67,79 @@ def extract_json_insights(text: str) -> dict:
 
 async def generate_ai_insights(api_key: str, competitor: str, topics: dict, sentiment: float, complaints: list) -> dict:
     """
-    Generate AI-enhanced strategic insights using the provided API key.
-    Returns enhanced insights for the dashboard.
+    Generate AI-enhanced strategic battlecard using the provided API key.
+    Returns enhanced insights for the dashboard and dataset.
     """
     if not api_key:
         return None
     
     provider = detect_provider(api_key)
-    print(f"🤖 Requesting strategic insights from AI Provider: {provider.upper()}")
+    print(f"🤖 Engaging AI Strategic Copilot via: {provider.upper()}")
     
-    # Create the prompt
-    prompt = f"""You are a market intelligence expert. Analyze this competitor data and provide strategic insights.
+    prompt = f"""You are a Silicon Valley Chief Product Officer and Competitive Intelligence Strategist.
+Analyze the following real-world public customer complaints regarding competitor: "{competitor}".
 
 COMPETITOR: {competitor}
-AVERAGE SENTIMENT: {sentiment} (scale: -1 = hate, +1 = love)
-TOP PAIN POINTS:
+AVERAGE SENTIMENT POLARITY: {sentiment} (scale: -1.0 = extreme anger, +1.0 = customer love)
+TOP PAIN POINT CLUSTERS:
 {json.dumps(topics, indent=2)}
 
-SAMPLE COMPLAINTS:
-{chr(10).join([f"- {c[:180]}" for c in complaints[:15]])}
+SAMPLE VERBATIM COMPLAINTS:
+{chr(10).join([f"- {c[:220]}" for c in complaints[:15]])}
 
-Provide a JSON response with exactly this structure:
+Produce an executive-grade Competitive Battlecard in valid JSON matching this exact structure:
 {{
-    "executive_summary": "2-3 sentence executive summary of competitor weaknesses.",
-    "top_opportunities": ["opportunity 1", "opportunity 2", "opportunity 3"],
-    "recommended_positioning": "Clear description of how to position your product against this competitor.",
-    "quick_wins": ["quick win 1", "quick win 2"],
-    "risk_level": "LOW/MEDIUM/HIGH - competitor vulnerability to disruption."
+    "executive_summary": "2-3 punchy, data-backed sentences outlining the competitor's biggest systemic vulnerabilities.",
+    "vulnerability_score": 8,
+    "top_pain_points": [
+        {{
+            "pain": "Brief pain title (e.g., Hidden enterprise pricing)",
+            "why_it_matters": "Why users are fed up",
+            "counter_feature": "What an alternative product should offer"
+        }}
+    ],
+    "marketing_angles": [
+        "Head-to-head marketing headline / ad hook #1",
+        "Head-to-head marketing headline / ad hook #2",
+        "Head-to-head marketing headline / ad hook #3"
+    ],
+    "product_roadmap_opportunities": [
+        "Feature / capability #1 to immediately poach their users",
+        "Feature / capability #2 to immediately poach their users",
+        "Feature / capability #3 to immediately poach their users"
+    ],
+    "swot_analysis": {{
+        "strengths": ["Perceived strength of competitor", "Why users originally chose them"],
+        "weaknesses": ["Core complaint #1", "Core complaint #2"],
+        "opportunities": ["Unmet demand or neglected niche", "Favorable migration wave"],
+        "threats": ["Risk of competitor fixing issues", "Vendor lock-in barriers"]
+    }}
 }}
 
-Return ONLY valid JSON. Do not include markdown formatting inside the JSON strings. Return nothing but the JSON object."""
+Return ONLY valid JSON. No conversational preamble or postscript."""
 
     try:
         if provider == 'gemini':
             return await call_gemini(api_key, prompt)
+        elif provider == 'anthropic':
+            return await call_anthropic(api_key, prompt)
         elif provider == 'openai':
             return await call_openai(api_key, prompt)
         else:
             return await call_openrouter(api_key, prompt)
     except Exception as e:
-        print(f"⚠️ AI analysis failed: {e}")
+        print(f"⚠️ AI Copilot call failed: {e}")
         return None
 
 
 async def call_gemini(api_key: str, prompt: str) -> dict:
     """Call Google Gemini API."""
-    # Standard stable Gemini 1.5 Flash endpoint (highly reliable and fast)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
-    
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.4,
-            "maxOutputTokens": 1000,
+            "temperature": 0.3,
+            "maxOutputTokens": 1500,
             "responseMimeType": "application/json"
         }
     }
@@ -123,9 +151,6 @@ async def call_gemini(api_key: str, prompt: str) -> dict:
                 text = data['candidates'][0]['content']['parts'][0]['text']
                 return extract_json_insights(text)
             else:
-                error = await response.text()
-                # Try fallback model if 1.5 flash fails/not found
-                print(f"⚠️ Gemini 1.5 Flash returned status {response.status}. Trying Gemini 2.0 Flash...")
                 fallback_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
                 async with session.post(fallback_url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as fb_res:
                     if fb_res.status == 200:
@@ -134,23 +159,47 @@ async def call_gemini(api_key: str, prompt: str) -> dict:
                         return extract_json_insights(text)
                     else:
                         fb_error = await fb_res.text()
-                        raise Exception(f"Gemini API error: {fb_res.status} - {fb_error[:200]}")
+                        raise Exception(f"Gemini API error ({fb_res.status}): {fb_error[:200]}")
+
+
+async def call_anthropic(api_key: str, prompt: str) -> dict:
+    """Call Anthropic Claude API."""
+    url = "https://api.anthropic.com/v1/messages"
+    headers = {
+        "x-api-key": api_key,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json"
+    }
+    payload = {
+        "model": "claude-3-5-haiku-latest",
+        "max_tokens": 1500,
+        "temperature": 0.3,
+        "messages": [{"role": "user", "content": prompt}]
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as response:
+            if response.status == 200:
+                data = await response.json()
+                text = data['content'][0]['text']
+                return extract_json_insights(text)
+            else:
+                err = await response.text()
+                raise Exception(f"Anthropic API error ({response.status}): {err[:200]}")
 
 
 async def call_openai(api_key: str, prompt: str) -> dict:
     """Call OpenAI API."""
     url = "https://api.openai.com/v1/chat/completions"
-    
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
     }
-    
     payload = {
         "model": "gpt-4o-mini",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4,
-        "max_tokens": 1000,
+        "temperature": 0.3,
+        "max_tokens": 1500,
         "response_format": {"type": "json_object"}
     }
     
@@ -162,25 +211,22 @@ async def call_openai(api_key: str, prompt: str) -> dict:
                 return extract_json_insights(text)
             else:
                 error = await response.text()
-                raise Exception(f"OpenAI API error: {response.status} - {error[:200]}")
+                raise Exception(f"OpenAI API error ({response.status}): {error[:200]}")
 
 
 async def call_openrouter(api_key: str, prompt: str) -> dict:
     """Call OpenRouter API."""
     url = "https://openrouter.ai/api/v1/chat/completions"
-    
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://apify.com/churn-scout"
+        "HTTP-Referer": "https://apify.com/lenient_grove/churn-scout"
     }
-    
-    # Use stable Llama 3 model which is cheap, fast, and highly capable
     payload = {
-        "model": "meta-llama/llama-3-8b-instruct:free",
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
         "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.4,
-        "max_tokens": 1000
+        "temperature": 0.3,
+        "max_tokens": 1500
     }
     
     async with aiohttp.ClientSession() as session:
@@ -190,18 +236,16 @@ async def call_openrouter(api_key: str, prompt: str) -> dict:
                 text = data['choices'][0]['message']['content']
                 return extract_json_insights(text)
             else:
-                error = await response.text()
-                # Try fallback models for OpenRouter free tier
                 fallback_models = [
                     "google/gemini-2.0-flash-exp:free",
-                    "mistralai/mistral-7b-instruct:free"
+                    "meta-llama/llama-3-8b-instruct:free"
                 ]
                 for model in fallback_models:
-                    print(f"⚠️ OpenRouter standard model failed. Trying fallback: {model}...")
                     payload["model"] = model
                     async with session.post(url, json=payload, headers=headers, timeout=aiohttp.ClientTimeout(total=30)) as fb_res:
                         if fb_res.status == 200:
                             fb_data = await fb_res.json()
                             text = fb_data['choices'][0]['message']['content']
                             return extract_json_insights(text)
-                raise Exception(f"OpenRouter API error: {response.status} - {error[:200]}")
+                err = await response.text()
+                raise Exception(f"OpenRouter API error ({response.status}): {err[:200]}")
