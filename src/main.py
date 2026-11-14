@@ -2,7 +2,14 @@ import asyncio
 import pandas as pd
 import random
 import aiohttp
-from apify import Actor, Event
+try:
+    from apify import Actor, Event
+except ImportError:
+    from apify import Actor
+    try:
+        from apify_shared.consts import ActorEvent as Event
+    except ImportError:
+        Event = None
 from textblob import TextBlob
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.cluster import KMeans
@@ -124,12 +131,12 @@ async def scrape_reddit(session: aiohttp.ClientSession, query: str, limit: int, 
         'Accept': 'application/json'
     }
     
-    Actor.log.info("🔴 Scanning Reddit communities for customer complaints & migration signals...")
+    Actor.log.info("Scanning Reddit communities for customer complaints and migration signals...")
     data = await fetch_json_with_retry(session, url, headers=headers, proxy=proxy)
     
     if data and isinstance(data, dict):
         children = data.get('data', {}).get('children', [])
-        Actor.log.info(f"📥 Reddit API returned {len(children)} candidate discussions")
+        Actor.log.info(f"Reddit API returned {len(children)} candidate discussions")
         for item in children:
             if len(results) >= limit:
                 break
@@ -180,12 +187,12 @@ async def scrape_hackernews(session: aiohttp.ClientSession, query: str, limit: i
         'Accept': 'application/json',
     }
 
-    Actor.log.info("🟠 Scanning Hacker News discussions via Algolia index...")
+    Actor.log.info("Scanning Hacker News discussions via Algolia index...")
     data = await fetch_json_with_retry(session, url, headers=headers, proxy=proxy)
 
     if data:
         hits = data.get('hits', [])
-        Actor.log.info(f"📥 Hacker News returned {len(hits)} matching comments/stories")
+        Actor.log.info(f"Hacker News returned {len(hits)} matching comments/stories")
         for hit in hits:
             if len(results) >= limit:
                 break
@@ -239,12 +246,12 @@ async def scrape_github_issues(session: aiohttp.ClientSession, query: str, limit
         'Accept': 'application/vnd.github.v3+json',
     }
 
-    Actor.log.info("🐙 Scanning GitHub public issues for bugs & performance defects...")
+    Actor.log.info("Scanning GitHub public issues for bugs and performance defects...")
     data = await fetch_json_with_retry(session, url, headers=headers, proxy=proxy)
 
     if data:
         items = data.get('items', [])
-        Actor.log.info(f"📥 GitHub API returned {len(items)} matching issues")
+        Actor.log.info(f"GitHub API returned {len(items)} matching issues")
         for item in items[:limit]:
             title = item.get('title', '')
             body = (item.get('body', '') or '')[:300]
@@ -294,11 +301,11 @@ async def scrape_devto(session: aiohttp.ClientSession, query: str, limit: int, c
         'Accept': 'application/json',
     }
 
-    Actor.log.info("📝 Scanning DEV.to engineering articles and case studies...")
+    Actor.log.info("Scanning DEV.to engineering articles and case studies...")
     data = await fetch_json_with_retry(session, url, headers=headers, proxy=proxy)
 
     if data:
-        Actor.log.info(f"📥 DEV.to returned {len(data)} matching articles")
+        Actor.log.info(f"DEV.to returned {len(data)} matching articles")
         for article in data[:limit]:
             title = article.get('title', '')
             description = article.get('description', '') or ''
@@ -342,12 +349,12 @@ async def scrape_stackexchange(session: aiohttp.ClientSession, query: str, limit
         'Accept': 'application/json',
     }
 
-    Actor.log.info("📚 Scanning StackOverflow questions for blockers and friction...")
+    Actor.log.info("Scanning StackOverflow questions for blockers and friction...")
     data = await fetch_json_with_retry(session, url, headers=headers, proxy=proxy)
 
     if data:
         questions = data.get('items', [])
-        Actor.log.info(f"📥 StackOverflow returned {len(questions)} matching questions")
+        Actor.log.info(f"StackOverflow returned {len(questions)} matching questions")
         for q in questions[:limit]:
             title = q.get('title', '')
             link = q.get('link', '')
@@ -471,7 +478,7 @@ def analyze_market_intel(data: list, min_sentiment: float = -0.05, focus_categor
     if not data:
         return pd.DataFrame()
 
-    Actor.log.info(f"🧠 Engaging Machine Learning Engine on {len(data)} collected signals...")
+    Actor.log.info(f"Engaging Machine Learning Engine on {len(data)} collected signals...")
     df = pd.DataFrame(data)
 
     # 1. Sentiment Polarity Scoring (-1.0 to +1.0)
@@ -557,12 +564,12 @@ async def main():
         custom_keywords = inputs.get('customKeywords', '')
         focus_category = inputs.get('focusCategory', 'All Categories')
 
-        Actor.log.info(f"🎯 Target Competitor: {competitor}")
-        Actor.log.info(f"📊 Sample Size Limit: {limit}")
-        Actor.log.info(f"🌐 Active Channels: {', '.join(sources)}")
-        Actor.log.info(f"🧠 Sentiment Threshold: <= {min_sentiment}")
+        Actor.log.info(f"Target Competitor: {competitor}")
+        Actor.log.info(f"Sample Size Limit: {limit}")
+        Actor.log.info(f"Active Channels: {', '.join(sources)}")
+        Actor.log.info(f"Sentiment Threshold: <= {min_sentiment}")
         if focus_category != "All Categories":
-            Actor.log.info(f"🔍 Priority Focus Category: {focus_category}")
+            Actor.log.info(f"Priority Focus Category: {focus_category}")
 
         # Setup proxy URL if configured
         proxy_url = None
@@ -571,16 +578,17 @@ async def main():
                 proxy_config = await Actor.create_proxy_configuration(actor_proxy_input=proxy)
                 if proxy_config:
                     proxy_url = await proxy_config.new_url()
-                    Actor.log.info("🛡️ Apify Proxy rotation activated")
+                    Actor.log.info("Apify Proxy rotation activated")
             except Exception as e:
                 Actor.log.warning(f"Proxy setup warning: {e}")
 
         # Graceful aborting handler
-        async def on_aborting():
-            Actor.log.warning("⚠️ Run aborting signal received! Saving current progress...")
-            await Actor.exit()
+        if Event and hasattr(Event, 'ABORTING'):
+            async def on_aborting():
+                Actor.log.warning("Run aborting signal received! Saving current progress...")
+                await Actor.exit()
 
-        Actor.on(Event.ABORTING, on_aborting)
+            Actor.on(Event.ABORTING, on_aborting)
 
         # Scrape channels concurrently
         all_results = []
@@ -606,7 +614,7 @@ async def main():
                 if res:
                     all_results.extend(res)
 
-        Actor.log.info(f"📊 Total signals captured: {len(all_results)}")
+        Actor.log.info(f"Total signals captured: {len(all_results)}")
 
         # Fallback to realistic mock data if all public APIs were blocked or empty
         if not all_results:
@@ -617,13 +625,13 @@ async def main():
         intel_df = analyze_market_intel(all_results, min_sentiment, focus_category)
 
         if intel_df.empty:
-            Actor.log.info("✅ No negative churn indicators found for target competitor.")
+            Actor.log.info("No negative churn indicators found for target competitor.")
             await Actor.push_data({"status": "Clean", "message": f"Zero churn signals detected for {competitor}."})
             return
 
         intel_df['competitor'] = competitor
         cvi_score = calculate_churn_vulnerability_index(intel_df)
-        Actor.log.info(f"⚡ Churn Vulnerability Index (CVI): {cvi_score}/100")
+        Actor.log.info(f"Churn Vulnerability Index (CVI): {cvi_score}/100")
 
         # 3. AI Copilot Strategic Insights
         ai_insights = None
@@ -660,7 +668,7 @@ async def main():
 
         kvs_id = os.environ.get('APIFY_DEFAULT_KEY_VALUE_STORE_ID', 'default')
         dashboard_url = f"https://api.apify.com/v2/key-value-stores/{kvs_id}/records/OUTPUT"
-        Actor.log.info(f"🚀 Churn Scout Dashboard Ready: {dashboard_url}")
+        Actor.log.info(f"Churn Scout Dashboard Ready: {dashboard_url}")
 
 
 if __name__ == '__main__':

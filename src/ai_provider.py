@@ -74,7 +74,7 @@ async def generate_ai_insights(api_key: str, competitor: str, topics: dict, sent
         return None
     
     provider = detect_provider(api_key)
-    print(f"🤖 Engaging AI Strategic Copilot via: {provider.upper()}")
+    print(f"Engaging AI Strategic Copilot via: {provider.upper()}")
     
     prompt = f"""You are a Silicon Valley Chief Product Officer and Competitive Intelligence Strategist.
 Analyze the following real-world public customer complaints regarding competitor: "{competitor}".
@@ -128,7 +128,7 @@ Return ONLY valid JSON. No conversational preamble or postscript."""
         else:
             return await call_openrouter(api_key, prompt)
     except Exception as e:
-        print(f"⚠️ AI Copilot call failed: {e}")
+        print(f"AI Copilot call failed: {e}")
         return None
 
 
