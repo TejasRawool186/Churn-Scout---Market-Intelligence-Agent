@@ -1,20 +1,26 @@
 {
     "actorOutputSchemaVersion": 1,
     "title": "Churn Scout Market Intelligence Output",
-    "description": "Market intelligence report with customer churn signals and AI-powered insights",
+    "description": "Executive intelligence dashboard, structured dataset of customer complaints, and AI competitive battlecard",
     "type": "object",
     "properties": {
         "dashboard": {
             "type": "string",
-            "title": "📊 Intelligence Dashboard",
-            "description": "Interactive HTML dashboard with visualized market intelligence",
+            "title": "📊 Interactive Intelligence Dashboard",
+            "description": "Hosted interactive HTML dashboard featuring visualized analytics, KPI charts, and live filterable evidence",
             "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/OUTPUT"
         },
-        "churnSignals": {
+        "dataset": {
             "type": "string",
-            "title": "📋 Churn Signals Data",
-            "description": "Raw dataset of all detected churn signals with sentiment scores",
+            "title": "📋 Churn Signals Dataset",
+            "description": "Exportable dataset of all detected competitor churn complaints with sentiment and risk scores",
             "template": "{{links.apiDefaultDatasetUrl}}/items"
+        },
+        "strategyReport": {
+            "type": "string",
+            "title": "🎯 AI Positioning Battlecard",
+            "description": "Structured executive report featuring competitor weaknesses, marketing hooks, and counter-positioning angles",
+            "template": "{{links.apiDefaultKeyValueStoreUrl}}/records/STRATEGY_REPORT"
         }
     }
 }

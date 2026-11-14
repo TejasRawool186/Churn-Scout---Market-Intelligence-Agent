@@ -1,0 +1,132 @@
+{
+    "actorSpecification": 1,
+    "fields": {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "competitor": {
+                "type": "string",
+                "nullable": true,
+                "description": "Target brand or competitor analyzed",
+                "example": "Slack"
+            },
+            "topic": {
+                "type": "string",
+                "nullable": true,
+                "description": "Primary pain point category identified by ML clustering",
+                "example": "Pricing & Licensing"
+            },
+            "churnRisk": {
+                "type": "string",
+                "nullable": true,
+                "description": "Quantified churn risk urgency (CRITICAL, HIGH, MEDIUM, LOW)",
+                "example": "CRITICAL"
+            },
+            "polarity": {
+                "type": "number",
+                "nullable": true,
+                "description": "Sentiment score ranging from -1.0 (extreme frustration) to +1.0 (positive)",
+                "example": -0.65
+            },
+            "source": {
+                "type": "string",
+                "nullable": true,
+                "description": "Origin public platform where the signal was detected",
+                "example": "Reddit"
+            },
+            "date": {
+                "type": "string",
+                "nullable": true,
+                "description": "Published date or discovery date in ISO YYYY-MM-DD format",
+                "example": "2026-11-14"
+            },
+            "engagement": {
+                "type": "integer",
+                "nullable": true,
+                "description": "Public community engagement (upvotes, reaction count, comments)",
+                "example": 84
+            },
+            "text": {
+                "type": "string",
+                "nullable": true,
+                "description": "Full extracted customer complaint or feedback text",
+                "example": "Looking for a self-hosted alternative to Slack because our enterprise license cost jumped 40%."
+            },
+            "url": {
+                "type": "string",
+                "nullable": true,
+                "description": "Direct URL link to the original community post or discussion thread",
+                "example": "https://www.reddit.com/r/SaaS/comments/xyz123"
+            },
+            "subCategory": {
+                "type": "string",
+                "nullable": true,
+                "description": "Granular topic subdivision or secondary keyword trigger",
+                "example": "Enterprise Pricing"
+            }
+        },
+        "required": [],
+        "additionalProperties": true
+    },
+    "views": {
+        "overview": {
+            "title": "Churn Signals Overview",
+            "description": "Actionable pain points and competitor dissatisfaction signals",
+            "transformation": {
+                "fields": [
+                    "competitor",
+                    "topic",
+                    "churnRisk",
+                    "polarity",
+                    "source",
+                    "date",
+                    "engagement",
+                    "text",
+                    "url"
+                ]
+            },
+            "display": {
+                "component": "table",
+                "properties": {
+                    "competitor": {
+                        "label": "Competitor",
+                        "format": "text"
+                    },
+                    "topic": {
+                        "label": "Pain Point Category",
+                        "format": "text"
+                    },
+                    "churnRisk": {
+                        "label": "Risk Level",
+                        "format": "text"
+                    },
+                    "polarity": {
+                        "label": "Sentiment Score",
+                        "format": "number"
+                    },
+                    "source": {
+                        "label": "Platform",
+                        "format": "text"
+                    },
+                    "date": {
+                        "label": "Date",
+                        "format": "date"
+                    },
+                    "engagement": {
+                        "label": "Engagement",
+                        "format": "number"
+                    },
+                    "text": {
+                        "label": "Complaint Snippet",
+                        "format": "text"
+                    },
+                    "url": {
+                        "label": "Source Thread",
+                        "format": "link"
+                    }
+                }
+            }
+        }
+    }
+}
+

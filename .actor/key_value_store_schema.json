@@ -1,0 +1,24 @@
+{
+    "actorKeyValueStoreSchemaVersion": 1,
+    "title": "Churn Scout Intelligence Reports",
+    "description": "Generated interactive HTML dashboards and AI competitive intelligence battlecards",
+    "collections": {
+        "dashboard": {
+            "title": "Executive Intelligence Dashboard",
+            "description": "Self-contained interactive HTML dashboard with Chart.js analytics and filterable signals",
+            "key": "OUTPUT",
+            "contentTypes": [
+                "text/html"
+            ]
+        },
+        "strategyReport": {
+            "title": "AI Strategic Positioning Battlecard",
+            "description": "Structured JSON report containing SWOT analysis, marketing copy angles, and product roadmap recommendations",
+            "key": "STRATEGY_REPORT",
+            "contentTypes": [
+                "application/json"
+            ]
+        }
+    }
+}
+
