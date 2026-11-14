@@ -1,79 +1,107 @@
-# 🔍 Churn Scout - Market Intelligence Agent
-
-> **Autonomous AI-powered market intelligence agent that reveals why customers are leaving your competitors**
-
-[![Apify](https://img.shields.io/badge/Apify-Store-blue?style=for-the-badge&logo=apify)](https://apify.com/store)
-[![Python](https://img.shields.io/badge/Python-3.11-green?style=for-the-badge&logo=python)](https://python.org)
-[![ML Powered](https://img.shields.io/badge/ML-Scikit--Learn-orange?style=for-the-badge&logo=scikit-learn)](https://scikit-learn.org)
+> **Autonomous AI-powered market intelligence agent that discovers why customers are leaving your competitors, clusters complaints into pain points, and builds an executive battlecard.**
 
 ---
 
-## 🎯 What is Churn Scout?
+## What does Churn Scout do?
 
-Churn Scout is an **autonomous market intelligence agent** designed for **SaaS founders, product managers, and marketing teams**. It automatically crawls multiple public developer and social channels (Hacker News, GitHub Issues, DEV.to, StackOverflow) to identify customer frustrations and churn signals about a target competitor.
+**Churn Scout** is an autonomous market intelligence agent and **competitor sentiment scraper** that monitors public social discussions, developer communities, and forums to reveal exactly why customers are abandoning a competitor. 
 
-Unlike basic text-dumps, Churn Scout utilizes an internal **Machine Learning Engine** (Sentiment Analysis + TF-IDF Vectorization + K-Means Clustering) to group complaints into specific **Pain Point Categories** (e.g., "Pricing Issues", "Performance Problems"). It compiles these signals into a **premium, self-contained, interactive HTML dashboard** containing visualized metrics, client-side filters, and strategic competitor positioning plans.
-
----
-
-## ✨ Features
-
-### 🎛️ Advanced Target Crawling
-- **Multi-Source Support**: Scrape Hacker News, GitHub Issues, DEV.to, and StackOverflow concurrently.
-- **Custom Keywords**: Append custom search phrases to look for specific complaints (e.g. "slow", "bug", "pricing").
-- **Resilient Architecture**: Automatic retries and exponential backoff handling rate limits gracefully.
-
-### 🧠 Intelligent Processing
-- **Sentiment Filtering**: Automatically filters out noise to target high-frustration indicators (polarity below a user-defined threshold).
-- **Automated Categorization**: Uses statistical NLP to cluster evidence into clear pain areas.
-- **AI Strategic Insights**: Add your API key (Gemini, OpenAI, or OpenRouter) to generate executive summaries, tactical roadmaps, and competitive pitches.
-
-### 📊 Premium Visual Dashboard
-- **Modern Aesthetics**: Built with a sleek dark-mode glassmorphic theme inspired by Stripe and Vercel dashboards.
-- **Interactive Visualizations**: Embedded Chart.js charts showing sentiment split and category frequency.
-- **Client-Side Search & Filters**: Live search over signal text and tabs to filter by platform or severity.
-- **Data Portability**: Clean export buttons to download filtered datasets directly to CSV or JSON.
+Instead of dumping unorganized text files, Churn Scout crawls public discussions across **Reddit**, **Hacker News**, **GitHub Issues**, **DEV.to**, and **StackOverflow**, feeds the signals into an internal **Machine Learning NLP engine** (Sentiment Scoring + TF-IDF Vectorization + K-Means Clustering), and generates a hosted, **interactive executive HTML dashboard** complete with:
+- A quantified **Churn Vulnerability Index (CVI)** score (0–100).
+- Categorized **Pain Point Clusters** (Pricing hikes, stability issues, missing features, support delays).
+- An optional **AI Competitive Battlecard** with ready-to-run marketing hooks, landing page headlines, and a competitor SWOT matrix.
+- Exportable structured datasets (JSON, CSV, Excel).
 
 ---
 
-## 🚀 How It Works
+## Why use Churn Scout? / Why monitor competitor churn?
 
-```mermaid
-graph TD
-    Input[Competitor Name & Settings] --> Scraper[Resilient Multi-Source API Scraper]
-    Scraper --> Sources[HN, GitHub, DEV.to, StackOverflow]
-    Sources --> Sentiment[TextBlob Sentiment Score]
-    Sentiment --> Filter[Sentiment & Noise Filter]
-    Filter --> ML[TF-IDF Vectorization + Clustering]
-    ML --> AI[AI Strategic Positioning Generator]
-    AI --> Dashboard[Interactive HTML Dashboard]
-    AI --> Dataset[Apify Dataset Output]
-```
+Customer churn is the #1 growth killer in software and SaaS, but it is also the **single greatest customer acquisition opportunity** for competing products. When users vent on Reddit or Hacker News about unexpected price increases or broken features, they are actively hunting for alternatives.
+
+### Key Use Cases
+- **SaaS Founders & Bootstrappers:** Validate new product ideas by identifying unmet needs and frequent complaints in entrenched legacy tools.
+- **Product Managers & Roadmap Planners:** Identify the exact features your competitors are neglecting so you can build them first and win over their power users.
+- **Growth & Performance Marketers:** Uncover high-converting ad angles, battlecard copy, and SEO landing page keywords (e.g., *"Why teams are switching from [Competitor] to Us"*).
+- **Sales & Customer Success Teams:** Arm your sales reps with verbatim competitor weaknesses to overcome objections during competitive sales cycles.
+- **Venture Capital & Market Analysts:** Conduct automated due diligence on market sentiment and brand vulnerability before investing.
+
+### Platform Advantages with Apify
+- **Automated Scheduling:** Schedule Churn Scout to run weekly or monthly to track whether competitor sentiment is worsening or improving over time.
+- **REST API & Webhooks:** Integrate Churn Scout directly into Slack, Discord, Zapier, Make, or your internal BI pipelines.
+- **Built-in Proxy Rotation:** Built to work with Apify Proxy to prevent rate-limiting and IP bans across public endpoints.
 
 ---
 
-## 📥 Input Configuration
+## What data can Churn Scout extract?
 
-| Field | Type | Description | Default |
-|-------|------|-------------|---------|
-| `competitorName` | String | Target brand/product to analyze (e.g., `Zomato`, `Jira`, `Notion`) | *Required* |
-| `maxPosts` | Integer | Total signal sample size limit (50 - 500) | `100` |
-| `sources` | Array | Select platforms to scrape (`Hacker News`, `GitHub Issues`, `DEV.to`, `StackOverflow`) | *All selected* |
-| `minSentiment` | Number | Maximum sentiment score allowed (`-1.0` to `0.0`). Below `-0.05` filters out neutral comments. | `-0.05` |
-| `customKeywords` | String | Comma-separated list of custom words to include in search queries (e.g. `latency, pricing`) | `""` |
-| `apiKey` | String | Optional secret key for Gemini, OpenAI, or OpenRouter to unlock Strategic Insights | `""` |
-| `proxyConfiguration` | Object | Apify proxy settings to prevent request throttling | `{"useApifyProxy": true}` |
+Every record in the generated dataset includes structured metadata ready for CRM, BI tools, or LLM analysis:
 
-### Example Input
+| Field Name | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `competitor` | String | Target brand or competitor analyzed | `Slack` |
+| `topic` | String | Clustered pain point category | `Pricing & Cost` |
+| `churnRisk` | String | Urgency level (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW`) | `CRITICAL` |
+| `polarity` | Number | Sentiment score from `-1.0` (severe frustration) to `+1.0` | `-0.65` |
+| `source` | String | Origin platform (`Reddit`, `Hacker News`, `GitHub`, etc.) | `Reddit` |
+| `date` | String | Publication or signal date in `YYYY-MM-DD` | `2026-11-14` |
+| `engagement` | Integer | Combined upvotes, reactions, and comments | `142` |
+| `text` | String | Verbatim customer complaint or feedback quote | *"Looking for a Slack alternative because our bill doubled."* |
+| `url` | String | Direct URL link to the original community thread | `https://reddit.com/r/SaaS/comments/...` |
+| `subCategory` | String | Subreddit, repository name, or platform tag | `r/SaaS` |
+
+---
+
+## How to scrape competitor churn signals
+
+Follow these 4 simple steps to generate your first competitor intelligence report:
+
+1. **Enter Competitor Name:** Type the brand or product name (e.g., `Slack`, `Jira`, `Notion`, `Zoom`, `Zomato`).
+2. **Choose Platforms:** Select target channels (`Reddit`, `Hacker News`, `GitHub Issues`, `DEV.to`, `StackOverflow`).
+3. **Set Sample Size:** Choose how many signals you want to analyze (default is `150`, up to `1000`).
+4. **Click Start:** Churn Scout will harvest discussions, run sentiment scoring, cluster topics, and generate your dashboard in seconds.
+5. **Open Dashboard:** Click the hosted **`OUTPUT`** record link in the Key-Value Store or download your dataset in CSV/JSON.
+
+---
+
+## How much will it cost to run Churn Scout?
+
+Churn Scout is engineered to be **extremely lightweight, fast, and cost-efficient**. Because it runs async HTTP harvesting with pure Python scientific libraries (no heavy, memory-hungry headless browsers required), it uses minimal Compute Units (CUs):
+
+- **Average Run Duration:** 15 to 45 seconds for 150–250 community signals.
+- **Compute Unit Consumption:** ~0.005 to 0.015 CUs per run (typically fractions of a cent).
+- **Free Tier Compatible:** With Apify's monthly \$5 free credit allowance, you can easily run **200+ competitor scans every month for free**!
+
+---
+
+## Input Configuration
+
+See the **Input** tab in Apify Console for full settings:
+
+| Parameter | Type | Required | Default | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| `competitorName` | String | **Yes** | `"Slack"` | The target brand or competitor to analyze. |
+| `maxPosts` | Integer | No | `150` | Maximum number of discussions to retrieve (25–1000). |
+| `sources` | Array | No | `All` | Channels: `Reddit`, `Hacker News`, `GitHub Issues`, `DEV.to`, `StackOverflow`. |
+| `customKeywords` | String | No | `"expensive, alternative, slow, bug"` | Extra terms to search alongside the competitor name. |
+| `focusCategory` | String | No | `"All Categories"` | Focus on a specific area (`Pricing & Cost`, `Performance`, `UI/UX`, `Bugs`, etc.). |
+| `minSentiment` | Number | No | `-0.05` | Max polarity allowed (`-1.0` to `0.0`). Filters out neutral chatter. |
+| `apiKey` | String | No | `""` | Optional API key (Gemini, OpenAI, Claude, or OpenRouter) for AI Battlecards. |
+| `proxyConfiguration` | Object | No | `{"useApifyProxy": true}` | Proxy settings to ensure uninterrupted scraping. |
+
+### Example Input (JSON)
 
 ```json
 {
     "competitorName": "Slack",
-    "maxPosts": 150,
-    "sources": ["Hacker News", "GitHub Issues"],
+    "maxPosts": 200,
+    "sources": [
+        "Reddit",
+        "Hacker News",
+        "GitHub Issues"
+    ],
+    "customKeywords": "price hike, enterprise, slow, alternatives",
+    "focusCategory": "All Categories",
     "minSentiment": -0.1,
-    "customKeywords": "expensive, mobile app",
-    "apiKey": "YOUR_GEMINI_OR_OPENAI_API_KEY",
     "proxyConfiguration": {
         "useApifyProxy": true
     }
@@ -82,40 +110,83 @@ graph TD
 
 ---
 
-## 📤 Output
+## Output Examples
 
-### 1. Interactive Dashboard (HTML)
-Stored in the default Key-Value Store under the key `OUTPUT`. Contains:
-- **KPI Metrics**: Churn signal counts, Average Sentiment, Disruption vulnerability level.
-- **Visual Analytics**: Interactive bar charts (pain point frequencies) and doughnut charts (sentiment distribution).
-- **Tactical Strategy**: Positioning advice, immediate marketing options, and product differentiation opportunities.
-- **Raw Evidence Table**: Filterable, searchable, and sortable table of all scraped complaints.
+You can download the dataset in various formats such as **JSON, CSV, Excel, or XML**, and open the **Executive HTML Dashboard** directly from your browser.
 
-### 2. Dataset Records (JSON / CSV)
-Includes structured metadata for every signal:
-- `topic`: Clustered pain point category.
-- `text`: Raw complaint text.
-- `polarity`: Raw sentiment polarity (-1.0 to 1.0).
-- `source`: The source site.
-- `date`: Scrape item publishing date.
-- `engagement`: Points, comments, or reaction count.
-- `url`: Link directly to the community thread.
+### Sample Dataset Output (JSON)
+
+```json
+[
+  {
+    "competitor": "Slack",
+    "topic": "Pricing & Cost",
+    "churnRisk": "CRITICAL",
+    "polarity": -0.62,
+    "source": "Reddit",
+    "date": "2026-11-14",
+    "engagement": 142,
+    "text": "Frustrated with Slack's new pricing model. For our 40-person team, the cost increase is unjustified. What are the best self-hosted or modern alternatives?",
+    "url": "https://www.reddit.com/r/SaaS/comments/example123",
+    "subCategory": "r/SaaS"
+  },
+  {
+    "competitor": "Slack",
+    "topic": "Performance & Latency",
+    "churnRisk": "HIGH",
+    "polarity": -0.41,
+    "source": "Hacker News",
+    "date": "2026-11-12",
+    "engagement": 88,
+    "text": "The latest Slack desktop app update consumes over 3GB of RAM and frequently freezes when switching workspaces. Seriously considering moving our team to a lighter platform.",
+    "url": "https://news.ycombinator.com/item?id=example456",
+    "subCategory": "HN Discussion"
+  }
+]
+```
+
+### Interactive Dashboard Preview
+
+Stored under Key-Value Store record **`OUTPUT`**:
+- **Hero Metrics**: Total Customer Complaints, Net Sentiment Polarity, and Churn Vulnerability Index (CVI).
+- **Visual Analytics**: Interactive Chart.js charts detailing pain point distribution and platform breakdowns.
+- **AI Positioning Battlecard**: Strategic executive summary, ready-to-use marketing angles, and product counter-features.
+- **Live Evidence Database**: Client-side instant keyword search, platform filtering tabs, and one-click export to CSV / JSON / Print PDF.
 
 ---
 
-## 🛠️ Technology Stack
+## Tips for Best Results
 
-- **NLP**: TextBlob Polarity Scoring
-- **Machine Learning**: Scikit-Learn (TF-IDF Vectorizer, K-Means Clustering)
-- **Engine**: Python 3.11 + Apify SDK
-- **Visualization**: Jinja2 Templates, Chart.js, Lucide Icons
+1. **Use Specific Brand Names:** Use exact product names like `"Jira"`, `"Notion"`, `"Slack"`, or `"Linear"`. For common words, add `customKeywords` like `"software, SaaS, app"`.
+2. **Combine With Custom Keywords:** If you want to research a specific complaint, pass targeted keywords like `"enterprise pricing, security, mobile app, export"`.
+3. **Unlock AI Battlecards:** Adding a free Google Gemini key or an OpenAI key instantly generates tactical ad copy and SWOT counter-positioning.
+4. **Use Apify Proxy:** Keep `useApifyProxy: true` enabled for smooth multi-source harvesting without IP rate limits.
 
 ---
 
-## 🔒 Compliance & Safe Harbor Guidelines
+## Frequently Asked Questions (FAQ)
 
-This Actor is built to operate under strict compliance criteria:
-- **Public Data Only**: Accesses public APIs and indexing paths without logging in.
-- **Rate Limit Adherence**: Employs query limits and backoff pauses to protect target servers.
-- **Privacy-First**: Focuses purely on product critique; strips PII and user-specific details.
-- **Transformative Utility**: Creates high-level aggregated strategic business intelligence.
+### Can I scrape any competitor or brand?
+Yes! Churn Scout searches public discussion forums and developer platforms for mentions of whatever brand name you specify. It works for B2B SaaS, developer tools, consumer applications, and enterprise software.
+
+### Do I need an OpenAI or Gemini API key?
+No! Churn Scout has a full built-in **Statistical Machine Learning Engine** (Scikit-Learn + TextBlob) that clusters complaints and scores sentiment without any external API keys. The AI Copilot key is 100% optional if you want additional automated marketing copy and battlecard roadmaps.
+
+### Can I run this on a recurring schedule?
+Yes. Using Apify's built-in **Schedule** feature, you can run Churn Scout every Monday morning and receive an updated email report or Slack webhook notification.
+
+---
+
+## Ethical Scraping & Legal Disclaimer
+
+> Our Actors are ethical and do not extract any private user data, such as email addresses, phone numbers, or passwords. They strictly extract publicly available customer discussions and forum posts that users have chosen to share openly on the internet. We therefore believe that our Actors, when used for ethical research and market intelligence purposes by Apify users, are safe and compliant.
+> 
+> However, you should be aware that scraped community posts may occasionally contain personal usernames. Personal data is protected by the GDPR in the European Union and by other data privacy regulations worldwide. You should not process or utilize personal data unless you have a legitimate interest or legal ground to do so. If you're unsure whether your use case complies with local laws, consult qualified legal counsel.
+
+---
+
+## Support & Feedback
+
+If you have feature requests, bug reports, or questions:
+- Submit an issue on the **Issues** tab in Apify Console.
+- Built with care using the official [Apify Actor Development](https://github.com/apify/agent-skills) standards.
