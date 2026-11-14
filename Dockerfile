@@ -1,16 +1,16 @@
-# Use Apify's optimized Python image
+# Use Apify's official lightweight Python 3.11 base image
 FROM apify/actor-python:3.11
 
-# 1. Install Playwright & Browsers
-RUN pip install playwright
-RUN playwright install --with-deps chromium
+# Set environment variables for clean Python execution
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# 2. Install Project Dependencies
+# Install Project Dependencies
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Copy Source Code
+# Copy Source Code and assets
 COPY . .
 
-# 4. Entry Point
+# Entry Point for Apify Actor
 CMD ["python3", "-m", "src.main"]
